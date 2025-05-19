@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lucky Wheel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      height: 100dvh;
+      margin: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      animation: colorSpin 10s linear infinite alternate;
+      background: linear-gradient(hsl(270, 100%, var(--from)), hsl(var(--to), 100%, 5%) 70%);
+    }
+
+    @property --from {
+      syntax: "<percentage>";
+      inherits: false;
+      initial-value: 0%;
+    }
+
+    @property --to {
+      syntax: "<number>";
+      inherits: false;
+      initial-value: 0;
+    }
+
+    @keyframes colorSpin {
+      0% {
+        --from: 20%;
+        --to: 270;
+      }
+
+      100% {
+        --from: 15%;
+        --to: 220;
+      }
+    }
+
+    canvas {
+      display: block;
+    }
+
+    #controls {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+      display: flex;
+      gap: 10px;
+    }
+
+    button {
+      border: none;
+      padding: 10px 20px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 20px;
+      cursor: pointer;
+      border-radius: 50px;
+      --shadow: 0 2px 2px rgba(0 0 0 / 0.2), 0 4px 10px rgba(0 0 0 / 0.2);
+      --inset: inset 0 -3px 0 rgba(0 0 0 / 0.2), inset 0 1px 0 rgba(255 255 255 / 0.2);
+      box-shadow: var(--shadow), var(--inset);
+      transition: all 0.1s;
+
+      &:active {
+        --inset: inset 0 -2px 0 rgba(0 0 0 / 0.2);
+        box-shadow: var(--shadow), var(--inset);
+        padding-block: 11px 9px;
+      }
+    }
+
+    #spinButton {
+      width: 200px;
+      background-color: hsl(122, 100%, 30%);
+      color: white;
+
+      &:hover {
+        background-color: hsl(122, 100%, 27%);
+      }
+    }
+
+    #refreshButton {
+      background-color: #ffffff;
+      color: #121212;
+      border: 1px solid #8d8d8d;
+
+      &:hover {
+        background-color: #e3e3e3;
+      }
+    }
+
+    #namesInput {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      z-index: 100;
+      width: 150px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #namesInput textarea {
+      width: 100%;
+      height: 260px;
+      padding: 10px;
+      border-radius: 4px;
+      border: 1px solid #8d8d8d;
+      background-color: #fff;
+      font-size: 16px;
+      resize: vertical;
+      font-family: Arial, sans-serif;
+    }
+
+    #result {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 100;
+      color: white;
+      font-size: 24px;
+      text-align: center;
+      text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8);
+      transition: all 0.5s ease;
+    }
+
+    .winner-announcement {
+      font-family: 'Dancing Script', cursive;
+      font-size: 80px;
+      background: linear-gradient(to bottom, #fff6a9 10%, #ffcc33 50%, #f1c232 51%, #ffb700 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: white;
+      position: relative;
+      display: inline-block;
+      filter: drop-shadow(0 0 6px rgba(255, 255, 0, 0.7));
+      text-shadow:
+        0 1px 0 #ccc,
+        0 2px 0 #c9c9c9,
+        0 3px 0 #bbb,
+        0 4px 0 #b9b9b9,
+        0 5px 0 #aaa,
+        0 6px 1px rgba(0, 0, 0, .4),
+        0 0 5px rgba(0, 0, 0, .3),
+        0 1px 3px rgba(0, 0, 0, .4),
+        0 3px 5px rgba(0, 0, 0, .3),
+        0 5px 15px rgba(0, 0, 0, .35),
+        0 10px 20px rgba(0, 0, 0, .3),
+        0 10px 30px rgba(0, 0, 0, .25);
+      animation: winner-pulse 1.5s infinite alternate;
+    }
+
+    @keyframes winner-pulse {
+      0% {
+        transform: scale(1);
+      }
+
+      100% {
+        transform: scale(1.2);
+      }
+    }
+
+    .controlsPanel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      z-index: 100;
+      background-color: transparent;
+      color: white;
+      border-radius: 4px;
+      border: 1px solid rgba(255 255 255 / 0.4);
+      overflow: hidden;
+      width: 140px;
+      font-size: 14px;
+    }
+
+    .controlsHeader {
+      padding: 8px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .controlsContent {
+      display: none;
+      flex-direction: column;
+    }
+
+    .controlSection {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+
+      &:first-child {
+        border-top: 1px solid rgba(255 255 255 / 0.2);
+      }
+
+      &:not(:last-child) {
+        border-bottom: 1px solid rgba(255 255 255 / 0.2);
+      }
+    }
+
+    .controlHeader {
+      color: rgba(255 255 255 / 0.8);
+    }
+
+    .controlRow {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .controlRow input[type="number"] {
+      width: 60px;
+      padding: 4px;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+    }
+
+    .controlRow input[type="checkbox"] {
+      margin: 0;
+    }
+
+    #fireworks-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100dvh;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="controls">
+    <button id="spinButton">SPIN</button>
+  </div>
+
+  <div id="namesInput">
+    <textarea id="namesList" placeholder="Enter names (one per line):
+    Mary
+    John
+    Samuel
+    Emma
+    Dave
+    Laura
+    etc..."></textarea>
+    <button id="refreshButton">REFRESH</button>
+  </div>
+
+  <div id="result"></div>
+  <div id="fireworks-container"></div>
+
+  <div class="controlsPanel" id="controlsPanel">
+    <div class="controlsHeader" id="controlsHeader">
+      <span>Controls</span>
+      <span id="controlsToggle">▼</span>
+    </div>
+    <div class="controlsContent" id="controlsContent">
+      <div class="controlSection">
+        <div class="controlHeader">Camera Position</div>
+        <div class="controlRow">
+          <label for="cameraX">X:</label>
+          <input type="number" id="cameraX" step="1" value="70">
+        </div>
+        <div class="controlRow">
+          <label for="cameraY">Y:</label>
+          <input type="number" id="cameraY" step="1" value="30">
+        </div>
+        <div class="controlRow">
+          <label for="cameraZ">Z:</label>
+          <input type="number" id="cameraZ" step="1" value="0">
+        </div>
+      </div>
+      <div class="controlSection">
+        <div class="controlHeader">Directional Light</div>
+        <div class="controlRow">
+          <label for="lightX">X:</label>
+          <input type="number" id="lightX" step="1" value="1">
+        </div>
+        <div class="controlRow">
+          <label for="lightY">Y:</label>
+          <input type="number" id="lightY" step="1" value="3">
+        </div>
+        <div class="controlRow">
+          <label for="lightZ">Z:</label>
+          <input type="number" id="lightZ" step="1" value="2">
+        </div>
+      </div>
+      <div class="controlSection">
+        <label class="controlRow" for="showAxes">Axes:
+          <input type="checkbox" id="showAxes">
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as three from 'https://cdn.jsdelivr.net/npm/three@0.176.0/+esm';
+    import { Fireworks } from 'https://cdn.jsdelivr.net/npm/fireworks-js@2.10.8/+esm'
+
+    const scene = new three.Scene();
+
+    const aspect = window.innerWidth / window.innerHeight;
+    const frustumSize = 20;
+    const camera = new three.OrthographicCamera(
+      (frustumSize * aspect) / -2, (frustumSize * aspect) / 2,
+      frustumSize / 2, frustumSize / -2,
+      1, 1000
+    );
+    camera.position.set(70, 30, 0);
+    camera.lookAt(0, 0, 0);
+
+    const renderer = new three.WebGLRenderer({ alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    const ambientLight = new three.AmbientLight(0xffffff, 1.5);
+    scene.add(ambientLight);
+
+    const directionalLight = new three.DirectionalLight(0xffffff, 1.2);
+    directionalLight.position.set(1, 3, 2);
+    directionalLight.castShadow = true;
+    directionalLight.shadow.mapSize.width = 2048;
+    directionalLight.shadow.mapSize.height = 2048;
+    directionalLight.shadow.camera.near = 1;
+    directionalLight.shadow.camera.far = 100;
+    directionalLight.shadow.camera.left = -40;
+    directionalLight.shadow.camera.right = 40;
+    directionalLight.shadow.camera.top = 40;
+    directionalLight.shadow.camera.bottom = -40;
+    scene.add(directionalLight);
+
+    const createAxes = () => {
+      const axesGroup = new three.Group();
+      const axisLength = 12;
+
+      const xAxisGeometry = new three.BufferGeometry();
+      xAxisGeometry.setAttribute('position', new three.Float32BufferAttribute([-axisLength, 0, 0, axisLength, 0, 0], 3));
+      const xAxisMaterial = new three.LineBasicMaterial({ color: 0xff0000 });
+      const xAxis = new three.Line(xAxisGeometry, xAxisMaterial);
+      axesGroup.add(xAxis);
+
+      const yAxisGeometry = new three.BufferGeometry();
+      yAxisGeometry.setAttribute('position', new three.Float32BufferAttribute([0, -axisLength / 2, 0, 0, axisLength / 2, 0], 3));
+      const yAxisMaterial = new three.LineBasicMaterial({ color: 0x00ff00 });
+      const yAxis = new three.Line(yAxisGeometry, yAxisMaterial);
+      axesGroup.add(yAxis);
+
+      const zAxisGeometry = new three.BufferGeometry();
+      zAxisGeometry.setAttribute('position', new three.Float32BufferAttribute([0, 0, -axisLength, 0, 0, axisLength], 3));
+      const zAxisMaterial = new three.LineBasicMaterial({ color: 0x0000ff });
+      const zAxis = new three.Line(zAxisGeometry, zAxisMaterial);
+      axesGroup.add(zAxis);
+
+      const makeAxisLabel = (text, position, color) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 64;
+        canvas.height = 64;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = `#${color.toString(16).padStart(6, '0')}`;
+        ctx.font = 'bold 10px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, 32, 32);
+
+        const texture = new three.CanvasTexture(canvas);
+        const material = new three.SpriteMaterial({ map: texture });
+        const sprite = new three.Sprite(material);
+        sprite.scale.set(2, 2, 1);
+        sprite.position.copy(position);
+        return sprite;
+      };
+
+      axesGroup.add(makeAxisLabel('X', new three.Vector3(axisLength, 0, 0), 0xff0000));
+      axesGroup.add(makeAxisLabel('Y', new three.Vector3(0, axisLength / 2, 0), 0x00ff00));
+      axesGroup.add(makeAxisLabel('Z', new three.Vector3(0, 0, axisLength), 0x0000ff));
+
+      scene.add(axesGroup);
+      return axesGroup;
+    };
+
+    const wheelRadius = 8;
+    const wheelThickness = 2;
+    let segments = 0;
+    let namesArray = [];
+
+    const createSegmentMaterial = (segments, i) => {
+      const hue = (i / segments) * 360;
+      const rgb = hslToRgb(hue, 1, 0.5);
+      const color = (rgb[0] << 16) | (rgb[1] << 8) | rgb[2];
+      return new three.MeshStandardMaterial({ color });
+    };
+
+    function hslToRgb(h, s, l) {
+      h /= 360;
+      let r, g, b;
+
+      if (s === 0) {
+        r = g = b = l;
+      } else {
+        const hue2rgb = (p, q, t) => {
+          if (t < 0) t += 1;
+          if (t > 1) t -= 1;
+          if (t < 1 / 6) return p + (q - p) * 6 * t;
+          if (t < 1 / 2) return q;
+          if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+          return p;
+        };
+
+        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        const p = 2 * l - q;
+        r = hue2rgb(p, q, h + 1 / 3);
+        g = hue2rgb(p, q, h);
+        b = hue2rgb(p, q, h - 1 / 3);
+      }
+
+      return [
+        Math.round(r * 255),
+        Math.round(g * 255),
+        Math.round(b * 255)
+      ];
+    }
+
+    const loadSavedNames = () => {
+      const savedNames = localStorage.getItem('wheelNames');
+      if (savedNames) {
+        const textarea = document.getElementById('namesList');
+        textarea.value = savedNames;
+      }
+    };
+
+    const saveNames = (text) => {
+      localStorage.setItem('wheelNames', text);
+    };
+
+    const parseNames = () => {
+      const textarea = document.getElementById('namesList');
+      const text = textarea.value.trim();
+
+      saveNames(text);
+
+      if (!text) {
+        namesArray = Array.from({ length: 10 }, (_, i) => (i + 1).toString());
+      } else {
+        namesArray = text.split('\n')
+          .map(name => name.trim())
+          .filter(name => name.length > 0);
+      }
+
+      segments = namesArray.length;
+
+      return namesArray;
+    };
+
+    const wheelGroup = new three.Group();
+    scene.add(wheelGroup);
+
+    const createArrow = () => {
+      const arrowGroup = new three.Group();
+
+      // Create triangle shape for arrow head
+      const arrowShape = new three.Shape();
+      arrowShape.moveTo(0, 0);
+      arrowShape.lineTo(1, -0.5);
+      arrowShape.lineTo(1, 0.5);
+      arrowShape.lineTo(0, 0);
+
+      const extrudeSettings = {
+        steps: 1,
+        depth: 0.3,
+        bevelEnabled: false
+      };
+
+      const arrowGeometry = new three.ExtrudeGeometry(arrowShape, extrudeSettings);
+      const arrowMaterial = new three.MeshStandardMaterial({ color: 0xff0000 });
+      const arrow = new three.Mesh(arrowGeometry, arrowMaterial);
+
+      arrow.position.set(wheelRadius + 1, 0, 0);
+      arrow.rotation.x = Math.PI / 2;
+      arrow.castShadow = true;
+      arrow.receiveShadow = true;
+
+      arrowGroup.add(arrow);
+      scene.add(arrowGroup);
+
+      return arrowGroup;
+    };
+
+    const createWheel = () => {
+      const segmentAngle = (Math.PI * 2) / segments;
+
+      for (let i = 0; i < segments; i++) {
+        const shape = new three.Shape();
+        shape.moveTo(0, 0);
+        shape.arc(0, 0, wheelRadius, i * segmentAngle, (i + 1) * segmentAngle, false);
+        shape.lineTo(0, 0);
+
+        const extrudeSettings = {
+          steps: 1,
+          depth: wheelThickness,
+          bevelEnabled: false
+        };
+
+        const segmentGeometry = new three.ExtrudeGeometry(shape, extrudeSettings);
+        const segment = new three.Mesh(segmentGeometry, createSegmentMaterial(segments, i));
+        segment.rotation.x = Math.PI / 2;
+        segment.position.y = wheelThickness / 2;
+        segment.castShadow = true;
+        segment.receiveShadow = true;
+        wheelGroup.add(segment);
+
+        const segmentMidAngle = i * segmentAngle + segmentAngle / 2;
+        const segmentName = namesArray[i] || (i + 1).toString();
+        const textCanvas = document.createElement('canvas');
+        textCanvas.width = 512;
+        textCanvas.height = 128;
+        const ctx = textCanvas.getContext('2d');
+        ctx.clearRect(0, 0, textCanvas.width, textCanvas.height);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = 'bold 64px Arial';
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 8;
+        ctx.strokeText(segmentName, textCanvas.width / 2, textCanvas.height / 2);
+        ctx.fillStyle = 'white';
+        ctx.fillText(segmentName, textCanvas.width / 2, textCanvas.height / 2);
+        const textTexture = new three.CanvasTexture(textCanvas);
+        const textMaterial = new three.MeshBasicMaterial({
+          map: textTexture,
+          transparent: true,
+          side: three.DoubleSide
+        });
+        const nameWidth = wheelRadius * segmentAngle;
+        const nameHeight = 1;
+        const nameMesh = new three.Mesh(
+          new three.PlaneGeometry(nameWidth, nameHeight),
+          textMaterial
+        );
+        const namePos = wheelRadius * 1.001;
+        nameMesh.position.set(
+          Math.cos(segmentMidAngle) * namePos,
+          0,
+          -Math.sin(segmentMidAngle) * namePos
+        );
+        nameMesh.lookAt(0, 0, 0);
+        nameMesh.rotateY(Math.PI);
+        wheelGroup.add(nameMesh);
+      }
+    };
+
+    loadSavedNames();
+    parseNames();
+    createWheel();
+    createArrow();
+    const axesGroup = createAxes();
+    axesGroup.visible = false;
+
+    let isSpinning = false;
+    let isAutoSpinning = true;
+    let spinSpeed = 0;
+    let autoSpinSpeed = 0.002;
+    const friction = 0.99;
+    const minSpinSpeed = 0.0001;
+
+    const spinButton = document.getElementById('spinButton');
+    spinButton.addEventListener('click', () => {
+      if (!isSpinning) {
+        isSpinning = true;
+        isAutoSpinning = false;
+        spinSpeed = 0.2 + Math.random() * 0.3;
+        document.getElementById('result').innerHTML = '';
+      }
+    });
+
+    const refreshButton = document.getElementById('refreshButton');
+    refreshButton.addEventListener('click', () => {
+      while (wheelGroup.children.length > 0) {
+        const object = wheelGroup.children[0];
+        object.geometry?.dispose();
+        object.material?.dispose();
+        wheelGroup.remove(object);
+      }
+
+      window.nameMeshes = [];
+
+      parseNames();
+      createWheel();
+      wheelGroup.rotation.y = 0;
+      isSpinning = false;
+      isAutoSpinning = true;
+      spinSpeed = 0;
+
+      document.getElementById('result').innerHTML = '';
+    });
+
+    const animate = () => {
+      requestAnimationFrame(animate);
+
+      if (isSpinning) {
+        wheelGroup.rotation.y = (wheelGroup.rotation.y + spinSpeed) % (Math.PI * 2);
+        spinSpeed *= friction;
+
+        if (spinSpeed < minSpinSpeed) {
+          isSpinning = false;
+          spinSpeed = 0;
+
+          const segmentAngle = (Math.PI * 2) / segments;
+          const winningIndex = segments - 1 - Math.floor(wheelGroup.rotation.y / segmentAngle);
+          const winner = namesArray[winningIndex];
+
+          const resultElement = document.getElementById('result');
+          resultElement.innerHTML = `<div class="winner-announcement">${winner}</div>`;
+
+          const container = document.getElementById('fireworks-container');
+          container.style.display = 'block';
+
+          const fireworks = new Fireworks(container, {
+            autoresize: true,
+            opacity: 0.8,
+            acceleration: 1.05,
+            friction: 0.97,
+            gravity: 1.5,
+            particles: 150,
+            traceLength: 3,
+            traceSpeed: 10,
+            explosion: 8,
+            intensity: 30,
+            flickering: 50,
+            lineStyle: 'round',
+            hue: {
+              min: 20,
+              max: 60
+            },
+            delay: {
+              min: 15,
+              max: 30
+            },
+            rocketsPoint: {
+              min: 50,
+              max: 50
+            },
+            lineWidth: {
+              explosion: {
+                min: 1,
+                max: 3
+              },
+              trace: {
+                min: 1,
+                max: 2
+              }
+            },
+            brightness: {
+              min: 50,
+              max: 80
+            },
+            decay: {
+              min: 0.015,
+              max: 0.03
+            },
+            mouse: {
+              click: false,
+              move: false,
+              max: 1
+            }
+          });
+
+          fireworks.start();
+
+          setTimeout(() => {
+            fireworks.stop();
+            setTimeout(() => {
+              container.style.display = 'none';
+              while (container.firstChild) {
+                container.removeChild(container.firstChild);
+              }
+            }, 1000);
+          }, 8000);
+        }
+      }
+      else if (isAutoSpinning) {
+        wheelGroup.rotation.y = (wheelGroup.rotation.y + autoSpinSpeed) % (Math.PI * 2);
+      }
+
+      renderer.render(scene, camera);
+    };
+    const controlsHeader = document.getElementById('controlsHeader');
+    const controlsContent = document.getElementById('controlsContent');
+    const controlsToggle = document.getElementById('controlsToggle');
+
+    controlsHeader.addEventListener('click', () => {
+      if (controlsContent.style.display === 'flex') {
+        controlsContent.style.display = 'none';
+        controlsToggle.textContent = '▼';
+      } else {
+        controlsContent.style.display = 'flex';
+        controlsToggle.textContent = '▲';
+      }
+    });
+
+    const cameraXInput = document.getElementById('cameraX');
+    const cameraYInput = document.getElementById('cameraY');
+    const cameraZInput = document.getElementById('cameraZ');
+
+    const updateCameraPosition = () => {
+      const x = parseFloat(cameraXInput.value);
+      const y = parseFloat(cameraYInput.value);
+      const z = parseFloat(cameraZInput.value);
+
+      camera.position.set(x, y, z);
+      camera.lookAt(0, 0, 0);
+    };
+
+    cameraXInput.addEventListener('input', updateCameraPosition);
+    cameraYInput.addEventListener('input', updateCameraPosition);
+    cameraZInput.addEventListener('input', updateCameraPosition);
+
+    const lightXInput = document.getElementById('lightX');
+    const lightYInput = document.getElementById('lightY');
+    const lightZInput = document.getElementById('lightZ');
+    const updateLightPosition = () => {
+      const x = parseFloat(lightXInput.value);
+      const y = parseFloat(lightYInput.value);
+      const z = parseFloat(lightZInput.value);
+      directionalLight.position.set(x, y, z);
+    };
+    lightXInput.addEventListener('input', updateLightPosition);
+    lightYInput.addEventListener('input', updateLightPosition);
+    lightZInput.addEventListener('input', updateLightPosition);
+
+    const showAxesCheckbox = document.getElementById('showAxes');
+    showAxesCheckbox.addEventListener('change', () => {
+      axesGroup.visible = showAxesCheckbox.checked;
+    });
+
+    window.addEventListener('resize', () => {
+      const aspect = window.innerWidth / window.innerHeight;
+      camera.left = (frustumSize * aspect) / -2;
+      camera.right = (frustumSize * aspect) / 2;
+      camera.top = frustumSize / 2;
+      camera.bottom = frustumSize / -2;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    animate();
+  </script>
+</body>
+
+</html>
