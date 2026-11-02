@@ -2,11 +2,15 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { Fireworks } from 'fireworks-js';
 import { createNamesEditor, formatLine } from './names.js';
+import { DEFAULT_THEME, THEMES } from './themes.js';
+import { createBackdrops } from './backdrops.js';
 
 const TAU = Math.PI * 2;
 const STORAGE_NAMES = 'wheelNames';
 const STORAGE_MUTED = 'wheelMuted';
 const STORAGE_COLLAPSED = 'wheelNamesCollapsed';
+const STORAGE_THEME = 'wheelTheme';
+const STORAGE_THEMES_COLLAPSED = 'wheelThemesCollapsed';
 
 const WHEEL_RADIUS = 8;
 const WHEEL_THICKNESS = 2;
@@ -14,18 +18,15 @@ const PEG_RISE = 0.4;
 const IDLE_SPEED = 0.12; // rad/s
 const FRUSTUM = 20;
 
-// Fixed segment colors, hand-shuffled so neighbors contrast. Repeats after 20.
-const PALETTE = [
-  '#e63946', '#3a86ff', '#ffbe0b', '#8338ec', '#06d6a0',
-  '#ff006e', '#80b918', '#118ab2', '#fb5607', '#9b5de5',
-  '#fee440', '#2a9d8f', '#f15bb5', '#4361ee', '#f4a261',
-  '#43aa8b', '#c1121f', '#00bbf9', '#ff7b00', '#7209b7',
-];
+// The inline script in index.html sets data-theme and collapse classes on <html> before first paint
+const root = document.documentElement;
+let theme = THEMES[root.dataset.theme] ?? THEMES[DEFAULT_THEME];
 
 const segmentColor = (i, count) => {
+  const { palette } = theme;
   // When the palette wraps exactly, the last segment would match the first one it touches
-  const last = count > 1 && i === count - 1 && i % PALETTE.length === 0;
-  return PALETTE[(i + (last ? 1 : 0)) % PALETTE.length];
+  const last = count > 1 && i === count - 1 && i % palette.length === 0;
+  return palette[(i + (last ? 1 : 0)) % palette.length];
 };
 
 const $ = (id) => document.getElementById(id);
@@ -42,15 +43,15 @@ renderer.shadowMap.enabled = true;
 
 const scene = new THREE.Scene();
 scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment()).texture;
-scene.environmentIntensity = 0.3;
 
 const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 1000);
 camera.position.set(70, 30, 0);
 camera.lookAt(0, 0, 0);
 
-scene.add(new THREE.HemisphereLight(0xffffff, 0x442266, 1));
+const hemisphere = new THREE.HemisphereLight();
+scene.add(hemisphere);
 
-const light = new THREE.DirectionalLight(0xffffff, 1.6);
+const light = new THREE.DirectionalLight(0xffffff);
 light.position.set(4, 12, 6);
 light.castShadow = true;
 light.shadow.mapSize.set(2048, 2048);
@@ -58,20 +59,90 @@ Object.assign(light.shadow.camera, { near: 1, far: 60, left: -15, right: 15, top
 light.shadow.radius = 4;
 scene.add(light);
 
-const floor = new THREE.Mesh(
-  new THREE.CircleGeometry(30, 64),
-  new THREE.ShadowMaterial({ opacity: 0.35 })
-);
+const floorMaterial = new THREE.ShadowMaterial();
+const floor = new THREE.Mesh(new THREE.CircleGeometry(30, 64), floorMaterial);
 floor.rotation.x = -Math.PI / 2;
 floor.position.y = -WHEEL_THICKNESS / 2 - 1.2;
 floor.receiveShadow = true;
 scene.add(floor);
 
-const axes = new THREE.AxesHelper(12);
-axes.visible = false;
-scene.add(axes);
+// Shared by rings, pegs, hub and the pointer cap; restyled in place on theme change
+const metal = new THREE.MeshStandardMaterial();
+const pointerMaterial = new THREE.MeshStandardMaterial({ metalness: 0.3, roughness: 0.35 });
 
-const gold = new THREE.MeshStandardMaterial({ color: 0xffc94a, metalness: 0.8, roughness: 0.3 });
+const applySceneTheme = () => {
+  const { lights, metal: m, pointer: p } = theme;
+  hemisphere.color.set(lights.sky);
+  hemisphere.groundColor.set(lights.ground);
+  hemisphere.intensity = lights.hemisphere;
+  light.intensity = lights.directional;
+  scene.environmentIntensity = lights.environment;
+  floorMaterial.opacity = lights.shadow;
+  metal.color.set(m.color);
+  metal.metalness = m.metalness;
+  metal.roughness = m.roughness;
+  metal.emissive.set(m.emissive);
+  metal.emissiveIntensity = m.glow;
+  pointerMaterial.color.set(p.color);
+  pointerMaterial.emissive.set(p.emissive);
+  pointerMaterial.emissiveIntensity = p.glow;
+  pointerMaterial.metalness = p.metalness ?? 0.3;
+  pointerMaterial.roughness = p.roughness ?? 0.35;
+};
+
+// Veined stone, tinted by each segment's color (map × color). Drawn once on
+// first use. The base is mid-gray so veins can come out lighter than the
+// stone, as in real marble. Extruded caps get UVs in world units, hence the small repeat.
+let marbleTexture;
+const getMarbleTexture = () => {
+  if (marbleTexture) return marbleTexture;
+  const size = 512;
+  const stone = document.createElement('canvas');
+  stone.width = stone.height = size;
+  const ctx = stone.getContext('2d');
+  const r = (max = size) => Math.random() * max;
+  ctx.fillStyle = '#c4c4c4';
+  ctx.fillRect(0, 0, size, size);
+
+  // Soft cloudy mottling
+  for (let i = 0; i < 40; i++) {
+    const x = r();
+    const y = r();
+    const radius = 40 + r(120);
+    const blotch = ctx.createRadialGradient(x, y, 0, x, y, radius);
+    blotch.addColorStop(0, Math.random() < 0.5 ? 'rgb(255 255 255 / 0.12)' : 'rgb(0 0 0 / 0.08)');
+    blotch.addColorStop(1, 'rgb(0 0 0 / 0)');
+    ctx.fillStyle = blotch;
+    ctx.fillRect(0, 0, size, size);
+  }
+
+  // Wobbly veins: random walks drifting diagonally, light and a few dark
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 14; i++) {
+    const light = i % 4 !== 0;
+    ctx.strokeStyle = light ? `rgb(255 255 255 / ${0.5 + r(0.5)})` : `rgb(40 30 30 / ${0.2 + r(0.2)})`;
+    ctx.lineWidth = 0.8 + r(light ? 2.6 : 1.2);
+    ctx.filter = `blur(${0.4 + r(1)}px)`;
+    let x = r();
+    let y = r();
+    let heading = Math.PI / 4 + (Math.random() - 0.5);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    for (let step = 0; step < 60; step++) {
+      heading += (Math.random() - 0.5) * 0.6;
+      x += Math.cos(heading) * 8;
+      y += Math.sin(heading) * 8;
+      ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  marbleTexture = new THREE.CanvasTexture(stone);
+  marbleTexture.colorSpace = THREE.SRGBColorSpace;
+  marbleTexture.wrapS = marbleTexture.wrapT = THREE.RepeatWrapping;
+  marbleTexture.repeat.set(1 / 12, 1 / 12);
+  return marbleTexture;
+};
+applySceneTheme();
 
 // Wheel
 
@@ -82,8 +153,8 @@ let hasPegs = false;
 const disposeChildren = (group) => {
   group.traverse((object) => {
     object.geometry?.dispose();
-    if (object.material && object.material !== gold) {
-      object.material.map?.dispose();
+    if (object.material && object.material !== metal) {
+      if (object.material.map !== marbleTexture) object.material.map?.dispose(); // marble is shared
       object.material.dispose();
     }
   });
@@ -97,7 +168,7 @@ const makeLabelTexture = (text, aspect) => {
   label.width = width;
   label.height = height;
   const ctx = label.getContext('2d');
-  const font = (size) => `700 ${size}px system-ui, sans-serif`;
+  const { font, fill, stroke, glow } = theme.label;
   const maxWidth = width * 0.9;
 
   // Shrink to fit, then truncate if still too long
@@ -115,9 +186,13 @@ const makeLabelTexture = (text, aspect) => {
   ctx.textBaseline = 'middle';
   ctx.lineJoin = 'round';
   ctx.lineWidth = size / 8;
-  ctx.strokeStyle = 'rgb(0 0 0 / 0.75)';
+  ctx.strokeStyle = stroke;
   ctx.strokeText(shown, width / 2, height / 2);
-  ctx.fillStyle = 'white';
+  if (glow) {
+    ctx.shadowColor = glow;
+    ctx.shadowBlur = size / 4;
+  }
+  ctx.fillStyle = fill;
   ctx.fillText(shown, width / 2, height / 2);
 
   const texture = new THREE.CanvasTexture(label);
@@ -152,7 +227,10 @@ const buildWheel = (names, colors) => {
       new THREE.ExtrudeGeometry(shape, { depth: WHEEL_THICKNESS, bevelEnabled: false, curveSegments }),
       new THREE.MeshStandardMaterial({
         color: colors[i],
-        roughness: 0.55,
+        map: theme.segment.marble ? getMarbleTexture() : null,
+        roughness: theme.segment.roughness,
+        emissive: colors[i],
+        emissiveIntensity: theme.segment.glow,
       })
     );
     segment.rotation.x = -Math.PI / 2;
@@ -178,7 +256,7 @@ const buildWheel = (names, colors) => {
 
     if (showPegs) {
       // Spans the rim and pokes above the top face, where the pointer catches it
-      const peg = new THREE.Mesh(new THREE.BoxGeometry(0.22, WHEEL_THICKNESS + PEG_RISE, 0.07), gold);
+      const peg = new THREE.Mesh(new THREE.BoxGeometry(0.22, WHEEL_THICKNESS + PEG_RISE, 0.07), metal);
       peg.position.set(Math.cos(start) * WHEEL_RADIUS, PEG_RISE / 2, -Math.sin(start) * WHEEL_RADIUS);
       peg.rotation.y = start;
       peg.castShadow = true;
@@ -187,14 +265,14 @@ const buildWheel = (names, colors) => {
   });
 
   for (const y of [-WHEEL_THICKNESS / 2, WHEEL_THICKNESS / 2]) {
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(WHEEL_RADIUS, 0.09, 12, 160), gold);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(WHEEL_RADIUS, 0.09, 12, 160), metal);
     ring.rotation.x = Math.PI / 2;
     ring.position.y = y;
     ring.castShadow = true;
     wheel.add(ring);
   }
 
-  const hub = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.3, 0.4, 48), gold);
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.3, 0.4, 48), metal);
   hub.position.y = WHEEL_THICKNESS / 2 + 0.2;
   hub.castShadow = true;
   wheel.add(hub);
@@ -218,14 +296,11 @@ const RELEASE_ANGLE = Math.asin((POINTER_LENGTH * Math.sin(RELEASE_SWING) - CONT
 
 const pointer = new THREE.Group();
 pointer.position.set(WHEEL_RADIUS - 0.05, POINTER_PIVOT, 0);
-const pointerTip = new THREE.Mesh(
-  new THREE.ConeGeometry(0.45, 1.6, 32),
-  new THREE.MeshStandardMaterial({ color: 0xe0282e, metalness: 0.3, roughness: 0.35 })
-);
+const pointerTip = new THREE.Mesh(new THREE.ConeGeometry(0.45, 1.6, 32), pointerMaterial);
 pointerTip.rotation.z = Math.PI; // tip points down at the rim
 pointerTip.position.y = 0.8 - POINTER_LENGTH;
 pointerTip.castShadow = true;
-const pointerCap = new THREE.Mesh(new THREE.SphereGeometry(0.32, 24, 16), gold);
+const pointerCap = new THREE.Mesh(new THREE.SphereGeometry(0.32, 24, 16), metal);
 pointerCap.castShadow = true;
 pointer.add(pointerTip, pointerCap);
 scene.add(pointer);
@@ -252,13 +327,23 @@ const ensureAudio = () => {
   return audio.state === 'suspended' ? audio.resume() : Promise.resolve();
 };
 
-const beep = (freq, start, duration, volume, type = 'triangle', endFreq = freq, destination = master) => {
+// A plucked-string tone: strong fundamental, quickly fading overtones
+let lyreWave;
+const LYRE_HARMONICS = [0, 1, 0.55, 0.3, 0.18, 0.1, 0.05];
+
+// Waveform follows the theme: soft triangle for classic, retro square for terminal themes
+const beep = (freq, start, duration, volume, type = theme.sound.wave, endFreq = freq, destination = master) => {
   const osc = audio.createOscillator();
   const gain = audio.createGain();
-  osc.type = type;
+  if (type === 'lyre') {
+    lyreWave ??= audio.createPeriodicWave(LYRE_HARMONICS.map(() => 0), LYRE_HARMONICS);
+    osc.setPeriodicWave(lyreWave);
+  } else {
+    osc.type = type;
+  }
   osc.frequency.setValueAtTime(freq, start);
   osc.frequency.exponentialRampToValueAtTime(endFreq, start + duration);
-  gain.gain.setValueAtTime(volume, start);
+  gain.gain.setValueAtTime(volume * theme.sound.volume, start);
   gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
   osc.connect(gain).connect(destination);
   osc.start(start);
@@ -288,16 +373,18 @@ const scheduleTicks = (times) => {
   tickBus = audio.createGain();
   tickBus.connect(master);
   const now = performance.now();
+  const { from, to, duration } = theme.sound.tick;
   for (const time of times) {
     if (time < now) continue;
-    beep(1800, Math.max(audio.currentTime, audioTimeAt(time + DISPLAY_DELAY)), 0.04, 0.12, 'triangle', 500, tickBus);
+    beep(from, Math.max(audio.currentTime, audioTimeAt(time + DISPLAY_DELAY)), duration, 0.12, undefined, to, tickBus);
   }
 };
 
 const playFanfare = () => {
   if (!canPlay()) return;
   const t = audio.currentTime;
-  [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => beep(freq, t + i * 0.11, 0.5, 0.12));
+  const { notes, gap, duration } = theme.sound.fanfare;
+  notes.forEach((freq, i) => beep(freq, t + i * gap, duration, 0.12));
 };
 
 // Names
@@ -305,9 +392,18 @@ const playFanfare = () => {
 const namesInput = $('namesList');
 const namesCount = $('namesCount');
 let names = []; // labels on the wheel, in segment order
-let entries = []; // wheel segments: { name, color, line } where line is the textarea line, or -1 for defaults
+let entries = []; // wheel segments: { name, slot, slots, line } where line is the textarea line, or -1 for defaults
 
-const defaultNames = () => Array.from({ length: 10 }, (_, i) => String(i + 1));
+const DEFAULT_COUNT = 10;
+
+const toRoman = (n) =>
+  [[10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']].reduce((out, [value, numeral]) => {
+    for (; n >= value; n -= value) out += numeral;
+    return out;
+  }, '');
+
+// Default entries are numbered at build time, so a theme can restyle them (I, II, III…)
+const defaultLabel = (n) => (theme.numerals === 'roman' ? toRoman(n) : String(n));
 
 let debounce;
 const editor = createNamesEditor({
@@ -325,27 +421,32 @@ const editor = createNamesEditor({
 const listedNames = () =>
   editor.lines.map((line, index) => ({ ...line, line: index })).filter((line) => line.name);
 
-// Color by position among all listed names (removed included), same as the gutter
-const withColors = (list) => list.map((entry, i) => ({ ...entry, color: segmentColor(i, list.length) }));
+// Colors follow position among all listed names (removed included), same as
+// the gutter. The slot is kept so a theme change can recolor in place.
+const withSlots = (list) => list.map((entry, slot) => ({ ...entry, slot, slots: list.length }));
+
+const rebuildWheel = () => {
+  if (entries.length) {
+    names = entries.map((entry) => (entry.line < 0 ? defaultLabel(entry.slot + 1) : entry.name));
+    buildWheel(names, entries.map((entry) => segmentColor(entry.slot, entry.slots)));
+  } else {
+    names = ['All names removed'];
+    buildWheel(names, [theme.emptyColor]);
+  }
+};
 
 const applyNames = () => {
   clearTimeout(debounce);
   localStorage.setItem(STORAGE_NAMES, namesInput.value.trim());
 
-  const listed = withColors(listedNames());
+  const listed = withSlots(listedNames());
   entries = listed.length
     ? listed.filter((entry) => entry.enabled)
-    : withColors(defaultNames().map((name) => ({ name, line: -1 })));
+    : withSlots(Array.from({ length: DEFAULT_COUNT }, () => ({ line: -1 })));
   const enabled = entries.length;
   namesCount.textContent = enabled < listed.length ? `${enabled} / ${listed.length}` : enabled;
 
-  if (enabled) {
-    names = entries.map((entry) => entry.name);
-    buildWheel(names, entries.map((entry) => entry.color));
-  } else {
-    names = ['All names removed'];
-    buildWheel(names, ['#55506a']);
-  }
+  rebuildWheel();
   hideWinner();
   state = 'idle';
   spinButton.disabled = !enabled;
@@ -376,8 +477,6 @@ if (/Mac|iPhone|iPad/.test(navigator.userAgent)) $('toggleKey').textContent = '�
 
 // Collapse
 
-// The class lives on <html> so the inline script in index.html can set it before first paint
-const root = document.documentElement;
 const namesToggle = $('namesToggle');
 
 const setCollapsed = (collapsed) => {
@@ -513,7 +612,7 @@ const fireworks = new Fireworks($('fireworks'), {
   intensity: 30,
   flickering: 50,
   lineStyle: 'round',
-  hue: { min: 20, max: 60 },
+  hue: theme.fireworksHue,
   delay: { min: 15, max: 30 },
   rocketsPoint: { min: 50, max: 50 },
   lineWidth: { explosion: { min: 1, max: 3 }, trace: { min: 1, max: 2 } },
@@ -626,20 +725,62 @@ addEventListener('keydown', (event) => {
   shortcut.run();
 });
 
-// Scene settings
+// Themes
 
-const bindVector = (ids, apply) => {
-  const inputs = ids.map($);
-  const update = () => apply(...inputs.map((input) => parseFloat(input.value) || 0));
-  inputs.forEach((input) => input.addEventListener('input', update));
+const backdrops = createBackdrops($('backdrop'));
+const themeList = $('themeList');
+const themesToggle = $('themesToggle');
+
+const applyTheme = async (requested) => {
+  const id = THEMES[requested] ? requested : DEFAULT_THEME;
+  const target = THEMES[id];
+  theme = target;
+  root.dataset.theme = id; // page styling switches right away
+  localStorage.setItem(STORAGE_THEME, id);
+  themeList.querySelectorAll('button').forEach((button) => {
+    button.setAttribute('aria-pressed', String(button.dataset.themeId === id));
+  });
+
+  // Wheel labels are drawn into canvases, so their font must be loaded first
+  await Promise.all((target.fontsToLoad ?? []).map((font) => document.fonts.load(font)));
+  if (theme !== target) return; // another theme was picked meanwhile
+
+  applySceneTheme();
+  rebuildWheel(); // keeps rotation and spin state
+  editor.render(); // gutter colors, and textarea height for the new font
+  fireworks.updateOptions({ hue: target.fireworksHue });
+  $('winnerLabel').textContent = target.winnerLabel;
+  for (const [name, backdrop] of Object.entries(backdrops)) {
+    if (name !== target.backdrop) backdrop.stop();
+  }
+  // Rain is animated, so it's skipped with reduced motion; marble is a still image
+  if (target.backdrop && !(target.backdrop === 'rain' && reducedMotion.matches)) {
+    backdrops[target.backdrop].start();
+  }
 };
 
-bindVector(['cameraX', 'cameraY', 'cameraZ'], (x, y, z) => {
-  camera.position.set(x, y, z);
-  camera.lookAt(0, 0, 0);
-});
-bindVector(['lightX', 'lightY', 'lightZ'], (x, y, z) => light.position.set(x, y, z));
-$('showAxes').addEventListener('change', (event) => (axes.visible = event.target.checked));
+for (const [id, { name, palette }] of Object.entries(THEMES)) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'theme-option';
+  button.dataset.themeId = id; // not data-theme, which the theme CSS keys on
+  const swatch = document.createElement('span');
+  swatch.className = 'swatch';
+  swatch.style.background = `conic-gradient(${palette.slice(0, 4).join(', ')})`;
+  button.append(swatch, name);
+  button.addEventListener('click', () => applyTheme(id));
+  themeList.append(button);
+}
+
+const setThemesCollapsed = (collapsed) => {
+  root.classList.toggle('themes-collapsed', collapsed);
+  themeList.inert = collapsed;
+  themesToggle.setAttribute('aria-expanded', String(!collapsed));
+  localStorage.setItem(STORAGE_THEMES_COLLAPSED, collapsed ? '1' : '0');
+};
+
+themesToggle.addEventListener('click', () => setThemesCollapsed(!root.classList.contains('themes-collapsed')));
+setThemesCollapsed(root.classList.contains('themes-collapsed'));
 
 // Layout
 
@@ -686,3 +827,4 @@ renderer.setAnimationLoop((time) => {
 namesInput.value = localStorage.getItem(STORAGE_NAMES) ?? '';
 editor.render();
 applyNames();
+applyTheme(root.dataset.theme);

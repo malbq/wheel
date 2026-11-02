@@ -9,7 +9,7 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎡</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Dancing+Script:wght@700&family=VT323&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   <script type="importmap">
     {
@@ -21,13 +21,19 @@
     }
   </script>
   <script>
-    // Apply saved collapse state before first paint, so it doesn't animate on load
-    if (localStorage.getItem('wheelNamesCollapsed') === '1') document.documentElement.classList.add('names-collapsed');
+    // Apply saved theme and collapse states before first paint, so nothing flashes or animates on load
+    {
+      const root = document.documentElement;
+      root.dataset.theme = localStorage.getItem('wheelTheme') || 'classic';
+      if (localStorage.getItem('wheelNamesCollapsed') === '1') root.classList.add('names-collapsed');
+      if (localStorage.getItem('wheelThemesCollapsed') === '1') root.classList.add('themes-collapsed');
+    }
   </script>
   <script type="module" src="main.js"></script>
 </head>
 
 <body>
+  <canvas id="backdrop" aria-hidden="true"></canvas>
   <canvas id="scene" aria-label="Spinning wheel of names"></canvas>
   <div id="fireworks" aria-hidden="true"></div>
 
@@ -78,7 +84,7 @@
 
   <div id="winner" class="winner" role="status" aria-live="polite">
     <div class="winner-card" hidden>
-      <p class="winner-label">The winner is</p>
+      <p class="winner-label" id="winnerLabel">The winner is</p>
       <div class="winner-name" id="winnerName"></div>
       <div class="row">
         <button type="button" class="btn btn-ghost" id="removeWinnerButton">Remove</button>
@@ -87,22 +93,17 @@
     </div>
   </div>
 
-  <details class="panel settings">
-    <summary>Scene</summary>
-    <fieldset>
-      <legend>Camera</legend>
-      <label>X <input type="number" id="cameraX" step="1" value="70"></label>
-      <label>Y <input type="number" id="cameraY" step="1" value="30"></label>
-      <label>Z <input type="number" id="cameraZ" step="1" value="0"></label>
-    </fieldset>
-    <fieldset>
-      <legend>Light</legend>
-      <label>X <input type="number" id="lightX" step="1" value="4"></label>
-      <label>Y <input type="number" id="lightY" step="1" value="12"></label>
-      <label>Z <input type="number" id="lightZ" step="1" value="6"></label>
-    </fieldset>
-    <label class="check"><input type="checkbox" id="showAxes"> Axes</label>
-  </details>
+  <nav class="panel theme-bar" aria-label="Themes">
+    <button type="button" class="theme-toggle" id="themesToggle" aria-expanded="true" aria-controls="themeList" title="Toggle themes">
+      <span aria-hidden="true">🎨</span> Themes
+      <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+        <path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+    </button>
+    <div class="theme-collapse">
+      <div class="theme-list" id="themeList"></div>
+    </div>
+  </nav>
 </body>
 
 </html>
