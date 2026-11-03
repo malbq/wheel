@@ -53,7 +53,7 @@ export const THEMES = {
       glow: '#00ff41',
     },
     metal: { color: 0x00ff41, metalness: 0.2, roughness: 0.4, emissive: 0x00ff41, glow: 0.7 },
-    pointer: { color: 0xffb000, emissive: 0xffb000, glow: 0.6 }, // amber, like the other classic terminal
+    pointer: { shape: 'crystal', color: 0xffb000, emissive: 0xffb000, glow: 0.6 }, // amber, like the other classic terminal
     lights: { sky: 0xc8ffd0, ground: 0x001a06, hemisphere: 0.7, directional: 1.1, environment: 0.12, shadow: 0.5 },
     // Square waves sound much louder at equal gain
     sound: { wave: 'square', volume: 0.4, tick: CLICK, fanfare: ARPEGGIO },
@@ -76,6 +76,7 @@ export const THEMES = {
     ],
     emptyColor: '#a88a5c',
     segment: { roughness: 0.55, glow: 0, texture: 'marble' }, // honed, veined stone; glossier washes colors out at this angle
+    hub: 'laurel', // gold coin in a laurel wreath
     label: {
       font: (size) => `700 ${Math.round(size * 0.85)}px Cinzel, serif`,
       fill: '#f6e9c8',
@@ -83,7 +84,7 @@ export const THEMES = {
       glow: null,
     },
     metal: { color: 0xd4a017, metalness: 0.9, roughness: 0.25, emissive: 0x000000, glow: 0 },
-    pointer: { color: 0xb06a2c, emissive: 0x000000, glow: 0, metalness: 0.8, roughness: 0.3 }, // bronze
+    pointer: { shape: 'spear', color: 0xd08a45, emissive: 0x000000, glow: 0, metalness: 0.75, roughness: 0.35, accent: 0x8a5f2e }, // bronze head, wooden shaft
     // Bright, slightly warm daylight with a pale stone bounce from below
     lights: { sky: 0xffffff, ground: 0x8a8070, color: 0xfff4e0, hemisphere: 1.3, directional: 1.8, environment: 0.3, shadow: 0.3 },
     // A lyre: soft plucks that ring a little, and an A-minor arpeggio
@@ -122,7 +123,7 @@ export const THEMES = {
       glow: null,
     },
     metal: { color: 0x4a4a52, metalness: 0.85, roughness: 0.45, emissive: 0x000000, glow: 0 }, // wrought iron
-    pointer: { color: 0xa8adb8, emissive: 0x000000, glow: 0, metalness: 0.9, roughness: 0.25 }, // polished steel
+    pointer: { shape: 'horn', color: 0xa8adb8, emissive: 0x000000, glow: 0, metalness: 0.9, roughness: 0.25, accent: 0xefe4cc }, // steel fittings, ivory horn
     lights: {
       sky: 0xffb070, ground: 0x1a0d05, color: 0xffb36b, // warm firelight
       hemisphere: 0.6, directional: 1.6, environment: 0.1, shadow: 0.6,
@@ -164,7 +165,7 @@ export const THEMES = {
       glow: null,
     },
     metal: { color: 0xd4a84a, metalness: 0.9, roughness: 0.25, emissive: 0x000000, glow: 0 }, // gold
-    pointer: { color: 0x1f4e8c, emissive: 0x000000, glow: 0, metalness: 0.4, roughness: 0.3 }, // lapis
+    pointer: { shape: 'ankh', color: 0x1f4e8c, emissive: 0x000000, glow: 0, metalness: 0.4, roughness: 0.3 }, // lapis inlay in gold
     // Hard desert sun with a warm sand bounce
     lights: { sky: 0xfff4d6, ground: 0xc89a5a, color: 0xfff0c8, hemisphere: 1.2, directional: 2, environment: 0.25, shadow: 0.4 },
     // A dry sistrum jingle, and a reed-like run up the hijaz scale
@@ -202,7 +203,7 @@ export const THEMES = {
       glow: null,
     },
     metal: { color: 0xb5893a, metalness: 0.95, roughness: 0.32, emissive: 0x000000, glow: 0 }, // brass
-    pointer: { color: 0xb87333, emissive: 0x000000, glow: 0, metalness: 0.95, roughness: 0.28 }, // copper
+    pointer: { shape: 'cone', color: 0xb87333, emissive: 0x000000, glow: 0, metalness: 0.95, roughness: 0.28 }, // copper
     // Warm gaslight; a stronger environment so the metals have something to reflect
     lights: { sky: 0xffe8c0, ground: 0x2a1a0a, color: 0xffd9a0, hemisphere: 0.8, directional: 1.8, environment: 0.55, shadow: 0.5 },
     // Clockwork ticks, and a steam whistle: a chord sounded together, sliding up as pressure builds
@@ -229,6 +230,7 @@ export const THEMES = {
     ],
     emptyColor: '#2b0f4a',
     segment: { roughness: 0.3, metalness: 0.2, glow: 0.3 },
+    hub: 'record', // vinyl record with a glowing label
     label: {
       font: (size) => `700 ${Math.round(size * 0.8)}px Orbitron, sans-serif`,
       fill: '#ffffff',
@@ -236,7 +238,7 @@ export const THEMES = {
       glow: '#ff2a6d',
     },
     metal: { color: 0x05d9e8, metalness: 0.3, roughness: 0.3, emissive: 0x05d9e8, glow: 0.9 }, // neon tubes
-    pointer: { color: 0xff2a6d, emissive: 0xff2a6d, glow: 0.7, metalness: 0.3, roughness: 0.3 },
+    pointer: { shape: 'triangle', color: 0xff2a6d, emissive: 0xff2a6d, glow: 0.7, metalness: 0.3, roughness: 0.3 },
     lights: { sky: 0xff6ec7, ground: 0x1a0b2e, color: 0xb0e0ff, hemisphere: 0.6, directional: 1.2, environment: 0.3, shadow: 0.5 },
     // Synth blips, and a filtered sawtooth arpeggio up A minor
     sound: {

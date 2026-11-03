@@ -97,7 +97,7 @@ const applySceneTheme = () => {
   pointerMaterial.emissiveIntensity = p.glow;
   pointerMaterial.metalness = p.metalness ?? 0.3;
   pointerMaterial.roughness = p.roughness ?? 0.35;
-  pointerGear.visible = Boolean(theme.pointerGear);
+  if (typeof buildPointer === 'function') buildPointer();
 };
 
 // Segment surface textures, tinted by each segment's color (map × color).
@@ -322,6 +322,169 @@ const makeAxis = () => {
   return axis;
 };
 
+// The disc at the wheel's center, per theme. Each builder returns a mesh or an
+// array of them; they sit on the wheel's top face and spin with it. Most rely on
+// `metal`, which is restyled in place per theme.
+const HUBS = {
+  // Gold boss
+  classic: () => {
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.3, 0.4, 48), metal);
+    hub.position.y = WHEEL_THICKNESS / 2 + 0.2;
+    hub.castShadow = true;
+    return hub;
+  },
+
+  // Shield boss: a low iron dome
+  boss: () => {
+    const boss = new THREE.Mesh(new THREE.SphereGeometry(1.4, 40, 16, 0, TAU, 0, Math.PI / 2), metal);
+    boss.scale.y = 0.55;
+    boss.position.y = WHEEL_THICKNESS / 2;
+    boss.castShadow = true;
+    return boss;
+  },
+
+  // Brass cog with lightening holes, and a bolt through its middle
+  gear: () => {
+    const holes = Array.from({ length: 6 }, (_, k) => {
+      const a = (k / 6) * TAU;
+      return [Math.cos(a) * 0.95, Math.sin(a) * 0.95, 0.3];
+    });
+    const cog = new THREE.Mesh(
+      new THREE.ExtrudeGeometry(makeGearShape(1.75, 16, 0.28, holes), { depth: 0.3, bevelEnabled: true, bevelSize: 0.03, bevelThickness: 0.03, bevelSegments: 1 }),
+      metal
+    );
+    cog.rotation.x = -Math.PI / 2;
+    cog.position.y = WHEEL_THICKNESS / 2;
+    cog.castShadow = true;
+    const bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.6, 6), metal);
+    bolt.position.y = WHEEL_THICKNESS / 2 + 0.3;
+    bolt.castShadow = true;
+    return [cog, bolt];
+  },
+
+  axis: () => makeAxis(),
+
+  // A four-sided cone is a pyramid; turned 45° so a face, not an edge, looks at the camera
+  pyramid: () => {
+    const pyramid = new THREE.Mesh(new THREE.ConeGeometry(1.5, 1.6, 4), metal);
+    pyramid.position.y = WHEEL_THICKNESS / 2 + 0.8;
+    pyramid.rotation.y = Math.PI / 4;
+    pyramid.castShadow = true;
+    return pyramid;
+  },
+
+  // Gold coin inside a laurel wreath, the leaves rising either side of it
+  laurel: () => {
+    const group = new THREE.Group();
+    const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.88, 0.88, 0.3, 48), metal);
+    coin.position.y = WHEEL_THICKNESS / 2 + 0.15;
+    coin.castShadow = true;
+    group.add(coin);
+
+    // A raised rim around the face, like a struck coin
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.72, 0.06, 10, 48), metal);
+    rim.rotation.x = -Math.PI / 2;
+    rim.position.y = WHEEL_THICKNESS / 2 + 0.3;
+    group.add(rim);
+
+    // Leaves: flattened blobs lying on the wheel, running up both sides from a
+    // knot at the bottom, each turned along the wreath
+    // A shade darker than the coin, and each blade turned to point out and up,
+    // so the wreath stands off the gold instead of blending into it
+    const leafMaterial = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(theme.metal.color).multiplyScalar(0.62),
+      metalness: theme.metal.metalness,
+      roughness: Math.min(1, theme.metal.roughness + 0.2),
+    });
+    const leafGeometry = new THREE.SphereGeometry(0.2, 10, 8);
+    for (const side of [-1, 1]) {
+      for (let i = 0; i < 9; i++) {
+        const angle = -Math.PI / 2 + side * (0.18 + (i / 8) * 2.45);
+        const radius = 1.36;
+        const leaf = new THREE.Mesh(leafGeometry, leafMaterial);
+        leaf.position.set(Math.cos(angle) * radius, WHEEL_THICKNESS / 2 + 0.26, -Math.sin(angle) * radius);
+        leaf.scale.set(0.34, 0.17, 1.25);
+        // Point each blade up the wreath, not straight out, so it reads as laurel
+        leaf.lookAt(
+          leaf.position.x - Math.sin(angle) * side,
+          WHEEL_THICKNESS / 2 + 0.85,
+          leaf.position.z - Math.cos(angle) * side
+        );
+        leaf.castShadow = true;
+        group.add(leaf);
+      }
+    }
+    const knot = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 8), leafMaterial);
+    knot.position.set(0, WHEEL_THICKNESS / 2 + 0.2, 1.42);
+    group.add(knot);
+    return group;
+  },
+
+  // Vinyl record: black disc, grooves and a glowing label painted on its face
+  record: () => {
+    const group = new THREE.Group();
+    const vinyl = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.95, 1.95, 0.12, 64),
+      new THREE.MeshStandardMaterial({ color: 0x08080e, roughness: 0.3, metalness: 0.3 })
+    );
+    vinyl.position.y = WHEEL_THICKNESS / 2 + 0.06;
+    vinyl.castShadow = true;
+    group.add(vinyl);
+
+    const size = 512;
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    const center = size / 2;
+    ctx.fillStyle = '#0a0a12';
+    ctx.beginPath();
+    ctx.arc(center, center, center, 0, TAU);
+    ctx.fill();
+    // Grooves
+    for (let r = center * 0.42; r < center; r += center * 0.028) {
+      ctx.strokeStyle = `rgb(150 150 180 / ${0.05 + Math.random() * 0.08})`;
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.arc(center, center, r, 0, TAU);
+      ctx.stroke();
+    }
+    // Neon label, with a bright ring and the spindle hole cut out
+    const label = ctx.createRadialGradient(center, center, 0, center, center, center * 0.36);
+    label.addColorStop(0, '#ff6ec7');
+    label.addColorStop(1, '#d300c5');
+    ctx.fillStyle = label;
+    ctx.beginPath();
+    ctx.arc(center, center, center * 0.36, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = '#05d9e8';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.arc(center, center, center * 0.36 - 4, 0, TAU);
+    ctx.stroke();
+    // A bright dash off-center, so the record's spin shows
+    ctx.fillStyle = '#05d9e8';
+    ctx.fillRect(center + center * 0.06, center - 2, center * 0.2, 4);
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath();
+    ctx.arc(center, center, center * 0.035, 0, TAU);
+    ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    const face = new THREE.Mesh(
+      new THREE.CircleGeometry(1.95, 64),
+      // Emissive too, so the label glows like the rest of the theme
+      new THREE.MeshStandardMaterial({ map: texture, emissive: 0xffffff, emissiveMap: texture, emissiveIntensity: 0.4, roughness: 0.28, metalness: 0.3 })
+    );
+    face.rotation.x = -Math.PI / 2;
+    face.position.y = WHEEL_THICKNESS / 2 + 0.125;
+    group.add(face);
+    return group;
+  },
+};
+
 const getSegmentTexture = (kind) => {
   if (!kind) return null;
   segmentTextures[kind] ??= makeTexture(TEXTURE_PAINTERS[kind]);
@@ -338,9 +501,10 @@ let hasPegs = false;
 const disposeChildren = (group) => {
   group.traverse((object) => {
     object.geometry?.dispose();
-    if (object.material && object.material !== metal) {
-      if (!isSharedTexture(object.material.map)) object.material.map?.dispose();
-      object.material.dispose();
+    for (const material of [object.material ?? []].flat()) {
+      if (material === metal || material === pointerMaterial) continue; // shared, restyled in place
+      if (!isSharedTexture(material.map)) material.map?.dispose();
+      material.dispose();
     }
   });
   group.clear();
@@ -459,45 +623,7 @@ const buildWheel = (names, colors) => {
     wheel.add(ring);
   }
 
-  if (theme.hub === 'boss') {
-    // Shield boss: a low iron dome
-    const boss = new THREE.Mesh(new THREE.SphereGeometry(1.4, 40, 16, 0, TAU, 0, Math.PI / 2), metal);
-    boss.scale.y = 0.55;
-    boss.position.y = WHEEL_THICKNESS / 2;
-    boss.castShadow = true;
-    wheel.add(boss);
-  } else if (theme.hub === 'gear') {
-    // Brass cog with lightening holes, and a bolt through its middle
-    const holes = Array.from({ length: 6 }, (_, k) => {
-      const a = (k / 6) * TAU;
-      return [Math.cos(a) * 0.95, Math.sin(a) * 0.95, 0.3];
-    });
-    const cog = new THREE.Mesh(
-      new THREE.ExtrudeGeometry(makeGearShape(1.75, 16, 0.28, holes), { depth: 0.3, bevelEnabled: true, bevelSize: 0.03, bevelThickness: 0.03, bevelSegments: 1 }),
-      metal
-    );
-    cog.rotation.x = -Math.PI / 2;
-    cog.position.y = WHEEL_THICKNESS / 2;
-    cog.castShadow = true;
-    const bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.6, 6), metal);
-    bolt.position.y = WHEEL_THICKNESS / 2 + 0.3;
-    bolt.castShadow = true;
-    wheel.add(cog, bolt);
-  } else if (theme.hub === 'axis') {
-    wheel.add(makeAxis());
-  } else if (theme.hub === 'pyramid') {
-    // A four-sided cone is a pyramid; turned 45° so a face, not an edge, looks at the camera
-    const pyramid = new THREE.Mesh(new THREE.ConeGeometry(1.5, 1.6, 4), metal);
-    pyramid.position.y = WHEEL_THICKNESS / 2 + 0.8;
-    pyramid.rotation.y = Math.PI / 4;
-    pyramid.castShadow = true;
-    wheel.add(pyramid);
-  } else {
-    const hub = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.3, 0.4, 48), metal);
-    hub.position.y = WHEEL_THICKNESS / 2 + 0.2;
-    hub.castShadow = true;
-    wheel.add(hub);
-  }
+  wheel.add(...[HUBS[theme.hub ?? 'classic']()].flat());
 
   if (theme.glyphRing) wheel.add(makeGlyphRing(theme.glyphRing));
 
@@ -530,28 +656,145 @@ const CONTACT_ANGLE = Math.asin(CONTACT_GAP / WHEEL_RADIUS); // peg is this far 
 const RELEASE_SWING = Math.acos((POINTER_PIVOT - PEG_TOP) / POINTER_LENGTH); // swing where the tip clears the peg
 const RELEASE_ANGLE = Math.asin((POINTER_LENGTH * Math.sin(RELEASE_SWING) - CONTACT_GAP) / WHEEL_RADIUS);
 
+// Each theme's pointer. Every builder returns mesh(es) in the pointer group's
+// space: pivot at the origin, tip at y = -POINTER_LENGTH, narrow near the tip,
+// so the peg contact maths holds for all of them.
+const POINTERS = {
+  // Red cone with a metal cap
+  cone: () => {
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.45, 1.6, 32), pointerMaterial);
+    tip.rotation.z = Math.PI; // tip points down at the rim
+    tip.position.y = 0.8 - POINTER_LENGTH;
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.32, 24, 16), metal);
+    return [tip, cap];
+  },
+
+  // Matrix: a data crystal, cut and glowing, on a thin needle
+  crystal: () => {
+    const needle = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.55, 16), pointerMaterial);
+    needle.rotation.z = Math.PI;
+    needle.position.y = -POINTER_LENGTH + 0.275;
+    const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.5, 0), pointerMaterial);
+    crystal.scale.set(1, 1.55, 1);
+    crystal.position.y = -0.6;
+    // Bright wireframe edges, so it reads as cut facets rather than a blob
+    const edges = new THREE.LineSegments(
+      new THREE.EdgesGeometry(crystal.geometry),
+      new THREE.LineBasicMaterial({ color: 0xfff3c4, transparent: true, opacity: 0.9 })
+    );
+    edges.scale.copy(crystal.scale);
+    edges.position.copy(crystal.position);
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.22, 20, 14), pointerMaterial);
+    return [needle, crystal, edges, cap];
+  },
+
+  // Imperium: a pilum, the legionary's spear: wooden shaft, iron head, lead ball
+  spear: () => {
+    const wood = new THREE.MeshStandardMaterial({ color: theme.pointer.accent ?? 0x6b4a24, roughness: 0.7, metalness: 0.05 });
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.1, 12), wood);
+    shaft.position.y = -0.55;
+    const collar = new THREE.Mesh(new THREE.SphereGeometry(0.14, 14, 10), metal);
+    collar.position.y = -1.05;
+    const head = new THREE.Mesh(new THREE.ConeGeometry(0.21, 0.75, 4), pointerMaterial);
+    head.rotation.z = Math.PI;
+    head.rotation.y = Math.PI / 4;
+    head.position.y = -1.425;
+    const knob = new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 12), metal);
+    return [shaft, collar, head, knob];
+  },
+
+  // Viking: a drinking horn, ivory bound with iron, mouth at the pivot
+  horn: () => {
+    const ivory = new THREE.MeshStandardMaterial({ color: theme.pointer.accent ?? 0xefe4cc, roughness: 0.55, metalness: 0.05 });
+    // Profile from the narrow tip at the rim up to the wide mouth at the pivot
+    const profile = [
+      [0.02, -POINTER_LENGTH],
+      [0.07, -1.5],
+      [0.13, -1.1],
+      [0.2, -0.65],
+      [0.28, -0.2],
+      [0.3, 0],
+    ].map(([radius, y]) => new THREE.Vector2(radius, y));
+    const horn = new THREE.Mesh(new THREE.LatheGeometry(profile, 24), ivory);
+    const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.05, 10, 24), metal);
+    mouth.rotation.x = Math.PI / 2;
+    const bandA = new THREE.Mesh(new THREE.TorusGeometry(0.215, 0.045, 8, 24), metal);
+    bandA.rotation.x = Math.PI / 2;
+    bandA.position.y = -0.6;
+    const bandB = new THREE.Mesh(new THREE.TorusGeometry(0.125, 0.04, 8, 24), metal);
+    bandB.rotation.x = Math.PI / 2;
+    bandB.position.y = -1.15;
+    return [horn, mouth, bandA, bandB];
+  },
+
+  // Desert: an ankh, gold with a lapis inlay down the stem
+  ankh: () => {
+    const group = new THREE.Group();
+    const loop = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.1, 12, 32), metal);
+    loop.position.y = -0.3;
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.17, 0.13), metal);
+    bar.position.y = -0.78;
+    const stem = new THREE.Mesh(new THREE.BoxGeometry(0.17, 1.2, 0.13), metal);
+    stem.position.y = -1.2;
+    // Lapis core, proud of the gold on the camera side
+    const inlay = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.0, 0.04), pointerMaterial);
+    inlay.position.set(0, -1.22, 0.09);
+    group.add(loop, bar, stem, inlay);
+    group.rotation.y = Math.PI / 2; // built flat in XY; turn it to face the camera
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 12), metal);
+    return [group, cap];
+  },
+
+  // Synthwave: a neon ▽ outline, glowing at the tip
+  triangle: () => {
+    const group = new THREE.Group();
+    const tube = (x0, y0, x1, y1) => {
+      const length = Math.hypot(x1 - x0, y1 - y0);
+      const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, length, 10), pointerMaterial);
+      mesh.position.set((x0 + x1) / 2, (y0 + y1) / 2, 0);
+      mesh.rotation.z = -Math.atan2(x1 - x0, y1 - y0);
+      return mesh;
+    };
+    group.add(tube(-0.66, -0.35, 0.66, -0.35), tube(0.66, -0.35, 0, -POINTER_LENGTH), tube(0, -POINTER_LENGTH, -0.66, -0.35));
+    for (const [x, y] of [[-0.66, -0.35], [0.66, -0.35], [0, -POINTER_LENGTH]]) {
+      const joint = new THREE.Mesh(new THREE.SphereGeometry(0.085, 10, 8), pointerMaterial);
+      joint.position.set(x, y, 0);
+      group.add(joint);
+    }
+    group.rotation.y = Math.PI / 2;
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 12), metal);
+    return [group, cap];
+  },
+};
+
+// Extruded shapes are built in XY with their depth along +Z; center and turn
+// them so they face the camera (which looks along -X)
+const facingCamera = (geometry, depth) => geometry.translate(0, 0, -depth / 2).rotateY(Math.PI / 2);
+
 const pointer = new THREE.Group();
 pointer.position.set(WHEEL_RADIUS - 0.05, POINTER_PIVOT, 0);
-const pointerTip = new THREE.Mesh(new THREE.ConeGeometry(0.45, 1.6, 32), pointerMaterial);
-pointerTip.rotation.z = Math.PI; // tip points down at the rim
-pointerTip.position.y = 0.8 - POINTER_LENGTH;
-pointerTip.castShadow = true;
-const pointerCap = new THREE.Mesh(new THREE.SphereGeometry(0.32, 24, 16), metal);
-pointerCap.castShadow = true;
-pointer.add(pointerTip, pointerCap);
 scene.add(pointer);
 
-// Small gear around the pivot, facing the camera; shown by themes with pointerGear,
-// turning with the wheel (geared up, like it's driven by the rim)
+// The pointer's look is per theme (POINTERS in pointers.js-style table below).
+// Every style keeps the pivot at the group's origin and its tip at
+// y = -POINTER_LENGTH, narrow near the tip, so the peg physics hold for all.
 const POINTER_GEAR_RATIO = 4;
-const pointerGearGeometry = new THREE.ExtrudeGeometry(makeGearShape(0.62, 12, 0.14), { depth: 0.12, bevelEnabled: false });
-pointerGearGeometry.translate(0, 0, -0.06).rotateY(Math.PI / 2); // center on the pivot, face +X
-const pointerGear = new THREE.Mesh(pointerGearGeometry, metal);
-pointerGear.castShadow = true;
-pointerGear.visible = false;
-pointer.add(pointerGear);
+let pointerGear = null; // Steampunk's pivot gear, turned with the wheel
 
-applySceneTheme(); // lights and shared materials; needs the pointer gear above
+const buildPointer = () => {
+  disposeChildren(pointer);
+  pointerGear = null;
+  pointer.add(...[POINTERS[theme.pointer.shape ?? 'cone']()].flat());
+  if (theme.pointerGear) {
+    // Small gear around the pivot, facing the camera, geared up as if driven by the rim
+    const geometry = new THREE.ExtrudeGeometry(makeGearShape(0.62, 12, 0.14), { depth: 0.12, bevelEnabled: false });
+    pointerGear = new THREE.Mesh(facingCamera(geometry, 0.12), metal);
+    pointer.add(pointerGear);
+  }
+  pointer.traverse((object) => (object.castShadow = true));
+};
+
+applySceneTheme(); // lights, shared materials and the pointer
 
 // Sound
 
@@ -1080,7 +1323,7 @@ renderer.setAnimationLoop((time) => {
 
   updatePointer(dt);
   if (axisStream && !reducedMotion.matches) axisStream.offset.y += dt * 0.8; // pulses flow down
-  if (pointerGear.visible) pointerGear.rotation.x = -wheel.rotation.y * POINTER_GEAR_RATIO;
+  if (pointerGear) pointerGear.rotation.x = -wheel.rotation.y * POINTER_GEAR_RATIO;
   if (theme.lights.flicker && !reducedMotion.matches) flickerTorchlight(time / 1000);
   renderer.render(scene, camera);
 });
