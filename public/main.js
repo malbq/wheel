@@ -70,12 +70,21 @@ scene.add(floor);
 const metal = new THREE.MeshStandardMaterial();
 const pointerMaterial = new THREE.MeshStandardMaterial({ metalness: 0.3, roughness: 0.35 });
 
+// Torchlight: a few out-of-step sine waves make an irregular, never-repeating-looking flicker
+const flickerTorchlight = (seconds) => {
+  const { lights } = theme;
+  const f = 1 + 0.1 * Math.sin(seconds * 7.3) + 0.06 * Math.sin(seconds * 13.7 + 1.3) + 0.04 * Math.sin(seconds * 23.1 + 2.1);
+  light.intensity = lights.directional * f;
+  hemisphere.intensity = lights.hemisphere * (0.5 + f / 2);
+};
+
 const applySceneTheme = () => {
   const { lights, metal: m, pointer: p } = theme;
   hemisphere.color.set(lights.sky);
   hemisphere.groundColor.set(lights.ground);
   hemisphere.intensity = lights.hemisphere;
   light.intensity = lights.directional;
+  light.color.set(lights.color ?? 0xffffff);
   scene.environmentIntensity = lights.environment;
   floorMaterial.opacity = lights.shadow;
   metal.color.set(m.color);
@@ -90,58 +99,142 @@ const applySceneTheme = () => {
   pointerMaterial.roughness = p.roughness ?? 0.35;
 };
 
-// Veined stone, tinted by each segment's color (map × color). Drawn once on
-// first use. The base is mid-gray so veins can come out lighter than the
-// stone, as in real marble. Extruded caps get UVs in world units, hence the small repeat.
-let marbleTexture;
-const getMarbleTexture = () => {
-  if (marbleTexture) return marbleTexture;
+// Segment surface textures, tinted by each segment's color (map × color).
+// Each is drawn once on first use and shared. Bases are mid-gray so details
+// can come out lighter than the surface as well as darker. Extruded caps get
+// UVs in world units, hence the small repeat.
+const segmentTextures = {};
+
+const makeTexture = (draw) => {
   const size = 512;
-  const stone = document.createElement('canvas');
-  stone.width = stone.height = size;
-  const ctx = stone.getContext('2d');
-  const r = (max = size) => Math.random() * max;
-  ctx.fillStyle = '#c4c4c4';
-  ctx.fillRect(0, 0, size, size);
-
-  // Soft cloudy mottling
-  for (let i = 0; i < 40; i++) {
-    const x = r();
-    const y = r();
-    const radius = 40 + r(120);
-    const blotch = ctx.createRadialGradient(x, y, 0, x, y, radius);
-    blotch.addColorStop(0, Math.random() < 0.5 ? 'rgb(255 255 255 / 0.12)' : 'rgb(0 0 0 / 0.08)');
-    blotch.addColorStop(1, 'rgb(0 0 0 / 0)');
-    ctx.fillStyle = blotch;
-    ctx.fillRect(0, 0, size, size);
-  }
-
-  // Wobbly veins: random walks drifting diagonally, light and a few dark
-  ctx.lineCap = 'round';
-  for (let i = 0; i < 14; i++) {
-    const light = i % 4 !== 0;
-    ctx.strokeStyle = light ? `rgb(255 255 255 / ${0.5 + r(0.5)})` : `rgb(40 30 30 / ${0.2 + r(0.2)})`;
-    ctx.lineWidth = 0.8 + r(light ? 2.6 : 1.2);
-    ctx.filter = `blur(${0.4 + r(1)}px)`;
-    let x = r();
-    let y = r();
-    let heading = Math.PI / 4 + (Math.random() - 0.5);
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    for (let step = 0; step < 60; step++) {
-      heading += (Math.random() - 0.5) * 0.6;
-      x += Math.cos(heading) * 8;
-      y += Math.sin(heading) * 8;
-      ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-  }
-  marbleTexture = new THREE.CanvasTexture(stone);
-  marbleTexture.colorSpace = THREE.SRGBColorSpace;
-  marbleTexture.wrapS = marbleTexture.wrapT = THREE.RepeatWrapping;
-  marbleTexture.repeat.set(1 / 12, 1 / 12);
-  return marbleTexture;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  draw(canvas.getContext('2d'), size, (max = size) => Math.random() * max);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(1 / 12, 1 / 12);
+  return texture;
 };
+
+const TEXTURE_PAINTERS = {
+  // Soft cloudy mottling, then wobbly veins drifting diagonally, mostly light.
+  // The texture is sRGB, so a #c4 base would darken colors to ~55%; keep it near white.
+  marble: (ctx, size, r) => {
+    ctx.fillStyle = '#e8e8e8';
+    ctx.fillRect(0, 0, size, size);
+    for (let i = 0; i < 40; i++) {
+      const x = r();
+      const y = r();
+      const blotch = ctx.createRadialGradient(x, y, 0, x, y, 40 + r(120));
+      blotch.addColorStop(0, Math.random() < 0.5 ? 'rgb(255 255 255 / 0.12)' : 'rgb(0 0 0 / 0.08)');
+      blotch.addColorStop(1, 'rgb(0 0 0 / 0)');
+      ctx.fillStyle = blotch;
+      ctx.fillRect(0, 0, size, size);
+    }
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 14; i++) {
+      const light = i % 4 !== 0;
+      ctx.strokeStyle = light ? `rgb(255 255 255 / ${0.5 + r(0.5)})` : `rgb(40 30 30 / ${0.2 + r(0.2)})`;
+      ctx.lineWidth = 0.8 + r(light ? 2.6 : 1.2);
+      ctx.filter = `blur(${0.4 + r(1)}px)`;
+      let x = r();
+      let y = r();
+      let heading = Math.PI / 4 + (Math.random() - 0.5);
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      for (let step = 0; step < 60; step++) {
+        heading += (Math.random() - 0.5) * 0.6;
+        x += Math.cos(heading) * 8;
+        y += Math.sin(heading) * 8;
+        ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+  },
+
+  // Planks: long wavy grain lines along x, a few knots with rings bent around them
+  wood: (ctx, size, r) => {
+    ctx.fillStyle = '#c8c8c8';
+    ctx.fillRect(0, 0, size, size);
+    const knots = Array.from({ length: 3 }, () => ({ x: r(), y: r(), radius: 10 + r(14) }));
+    for (let y = 0; y < size; y += 2 + r(5)) {
+      const dark = Math.random() < 0.6;
+      ctx.strokeStyle = dark ? `rgb(40 25 15 / ${0.08 + r(0.22)})` : `rgb(255 245 230 / ${0.06 + r(0.12)})`;
+      ctx.lineWidth = 0.6 + r(2);
+      const phase = r(Math.PI * 2);
+      ctx.beginPath();
+      for (let x = 0; x <= size; x += 8) {
+        // Grain swells around knots
+        let bend = Math.sin(x / 60 + phase) * 2;
+        for (const knot of knots) {
+          const d = Math.hypot(x - knot.x, y - knot.y);
+          if (d < knot.radius * 4) bend += Math.sign(y - knot.y || 1) * (knot.radius * 4 - d) * 0.25;
+        }
+        if (x === 0) ctx.moveTo(x, y + bend);
+        else ctx.lineTo(x, y + bend);
+      }
+      ctx.stroke();
+    }
+    for (const knot of knots) {
+      for (let ring = knot.radius; ring > 2; ring -= 3) {
+        ctx.strokeStyle = 'rgb(50 30 15 / 0.35)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.ellipse(knot.x, knot.y, ring * 1.8, ring, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+  },
+};
+
+// Elder Futhark carved in a ring on the wheel's top face, just inside the
+// studs: a transparent disc laid over the segments. Each rune is drawn twice,
+// a dark groove and a faint lit edge, so it reads as cut into the wood.
+const FUTHARK = 'ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗᛚᛜᛞᛟ';
+
+const makeRuneRing = () => {
+  const size = 2048;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const center = size / 2;
+  const radius = center * ((WHEEL_RADIUS - 0.95) / WHEEL_RADIUS); // texture spans the whole disc
+  const count = FUTHARK.length * 2;
+  ctx.font = `${Math.round(size * 0.042)}px "Noto Sans Runic", serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * TAU;
+    ctx.save();
+    ctx.translate(center + Math.cos(angle) * radius, center + Math.sin(angle) * radius);
+    ctx.rotate(angle + Math.PI / 2); // upright, reading around the rim
+    const rune = [...FUTHARK][i % FUTHARK.length];
+    ctx.fillStyle = 'rgb(255 225 180 / 0.22)';
+    ctx.fillText(rune, 2.5, 2.5);
+    ctx.fillStyle = 'rgb(14 6 2 / 0.85)';
+    ctx.fillText(rune, 0, 0);
+    ctx.restore();
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  const disc = new THREE.Mesh(
+    new THREE.CircleGeometry(WHEEL_RADIUS, 96),
+    new THREE.MeshStandardMaterial({ map: texture, transparent: true, roughness: 0.9, depthWrite: false })
+  );
+  disc.rotation.x = -Math.PI / 2;
+  disc.position.y = WHEEL_THICKNESS / 2 + 0.005;
+  disc.receiveShadow = true;
+  return disc;
+};
+
+const getSegmentTexture = (kind) => {
+  if (!kind) return null;
+  segmentTextures[kind] ??= makeTexture(TEXTURE_PAINTERS[kind]);
+  return segmentTextures[kind];
+};
+const isSharedTexture = (texture) => Object.values(segmentTextures).includes(texture);
 applySceneTheme();
 
 // Wheel
@@ -154,7 +247,7 @@ const disposeChildren = (group) => {
   group.traverse((object) => {
     object.geometry?.dispose();
     if (object.material && object.material !== metal) {
-      if (object.material.map !== marbleTexture) object.material.map?.dispose(); // marble is shared
+      if (!isSharedTexture(object.material.map)) object.material.map?.dispose();
       object.material.dispose();
     }
   });
@@ -227,7 +320,7 @@ const buildWheel = (names, colors) => {
       new THREE.ExtrudeGeometry(shape, { depth: WHEEL_THICKNESS, bevelEnabled: false, curveSegments }),
       new THREE.MeshStandardMaterial({
         color: colors[i],
-        map: theme.segment.marble ? getMarbleTexture() : null,
+        map: getSegmentTexture(theme.segment.texture),
         roughness: theme.segment.roughness,
         emissive: colors[i],
         emissiveIntensity: theme.segment.glow,
@@ -272,10 +365,33 @@ const buildWheel = (names, colors) => {
     wheel.add(ring);
   }
 
-  const hub = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.3, 0.4, 48), metal);
-  hub.position.y = WHEEL_THICKNESS / 2 + 0.2;
-  hub.castShadow = true;
-  wheel.add(hub);
+  if (theme.boss) {
+    // Shield boss: a low iron dome
+    const boss = new THREE.Mesh(new THREE.SphereGeometry(1.4, 40, 16, 0, TAU, 0, Math.PI / 2), metal);
+    boss.scale.y = 0.55;
+    boss.position.y = WHEEL_THICKNESS / 2;
+    boss.castShadow = true;
+    wheel.add(boss);
+  } else {
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.3, 0.4, 48), metal);
+    hub.position.y = WHEEL_THICKNESS / 2 + 0.2;
+    hub.castShadow = true;
+    wheel.add(hub);
+  }
+
+  if (theme.runeRing) wheel.add(makeRuneRing());
+
+  // Iron-bound look: domed studs evenly around the top rim, independent of segments
+  if (theme.studs) {
+    const stud = new THREE.SphereGeometry(0.13, 12, 6, 0, TAU, 0, Math.PI / 2);
+    for (let i = 0; i < 36; i++) {
+      const angle = (i / 36) * TAU;
+      const mesh = new THREE.Mesh(stud, metal);
+      mesh.position.set(Math.cos(angle) * (WHEEL_RADIUS - 0.35), WHEEL_THICKNESS / 2, -Math.sin(angle) * (WHEEL_RADIUS - 0.35));
+      mesh.castShadow = true;
+      wheel.add(mesh);
+    }
+  }
 };
 
 // Pointer: hangs over the front rim, pivoting at its top. Its tip dips below
@@ -331,21 +447,31 @@ const ensureAudio = () => {
 let lyreWave;
 const LYRE_HARMONICS = [0, 1, 0.55, 0.3, 0.18, 0.1, 0.05];
 
-// Waveform follows the theme: soft triangle for classic, retro square for terminal themes
-const beep = (freq, start, duration, volume, type = theme.sound.wave, endFreq = freq, destination = master) => {
+// One decaying tone. `voice` is a theme's tick or fanfare settings, which can
+// override the theme's waveform and volume and add a low-pass filter (to
+// soften harsh waves into something horn-like).
+const beep = (freq, start, duration, voice, { endFreq = freq, destination = master } = {}) => {
+  const { wave = theme.sound.wave, volume = 1, lowpass } = voice;
   const osc = audio.createOscillator();
   const gain = audio.createGain();
-  if (type === 'lyre') {
+  if (wave === 'lyre') {
     lyreWave ??= audio.createPeriodicWave(LYRE_HARMONICS.map(() => 0), LYRE_HARMONICS);
     osc.setPeriodicWave(lyreWave);
   } else {
-    osc.type = type;
+    osc.type = wave;
   }
   osc.frequency.setValueAtTime(freq, start);
   osc.frequency.exponentialRampToValueAtTime(endFreq, start + duration);
-  gain.gain.setValueAtTime(volume * theme.sound.volume, start);
+  gain.gain.setValueAtTime(0.12 * volume * theme.sound.volume, start);
   gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-  osc.connect(gain).connect(destination);
+  let output = osc;
+  if (lowpass) {
+    const filter = audio.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = lowpass;
+    output = osc.connect(filter);
+  }
+  output.connect(gain).connect(destination);
   osc.start(start);
   osc.stop(start + duration);
 };
@@ -373,18 +499,19 @@ const scheduleTicks = (times) => {
   tickBus = audio.createGain();
   tickBus.connect(master);
   const now = performance.now();
-  const { from, to, duration } = theme.sound.tick;
+  const { tick } = theme.sound;
   for (const time of times) {
     if (time < now) continue;
-    beep(from, Math.max(audio.currentTime, audioTimeAt(time + DISPLAY_DELAY)), duration, 0.12, undefined, to, tickBus);
+    const start = Math.max(audio.currentTime, audioTimeAt(time + DISPLAY_DELAY));
+    beep(tick.from, start, tick.duration, tick, { endFreq: tick.to, destination: tickBus });
   }
 };
 
 const playFanfare = () => {
   if (!canPlay()) return;
   const t = audio.currentTime;
-  const { notes, gap, duration } = theme.sound.fanfare;
-  notes.forEach((freq, i) => beep(freq, t + i * gap, duration, 0.12));
+  const { fanfare } = theme.sound;
+  fanfare.notes.forEach((freq, i) => beep(freq, t + i * fanfare.gap, fanfare.duration, fanfare));
 };
 
 // Names
@@ -742,7 +869,8 @@ const applyTheme = async (requested) => {
   });
 
   // Wheel labels are drawn into canvases, so their font must be loaded first
-  await Promise.all((target.fontsToLoad ?? []).map((font) => document.fonts.load(font)));
+  // An entry can be [font, sample text] for fonts split by unicode-range
+  await Promise.all((target.fontsToLoad ?? []).map((font) => document.fonts.load(...[font].flat())));
   if (theme !== target) return; // another theme was picked meanwhile
 
   applySceneTheme();
@@ -753,10 +881,7 @@ const applyTheme = async (requested) => {
   for (const [name, backdrop] of Object.entries(backdrops)) {
     if (name !== target.backdrop) backdrop.stop();
   }
-  // Rain is animated, so it's skipped with reduced motion; marble is a still image
-  if (target.backdrop && !(target.backdrop === 'rain' && reducedMotion.matches)) {
-    backdrops[target.backdrop].start();
-  }
+  if (target.backdrop) backdrops[target.backdrop].start({ animate: !reducedMotion.matches });
 };
 
 for (const [id, { name, palette }] of Object.entries(THEMES)) {
@@ -819,6 +944,7 @@ renderer.setAnimationLoop((time) => {
   }
 
   updatePointer(dt);
+  if (theme.lights.flicker && !reducedMotion.matches) flickerTorchlight(time / 1000);
   renderer.render(scene, camera);
 });
 

@@ -628,6 +628,12 @@ kbd {
     font-weight: 700;
     color: #f3d98b;
   }
+
+  &[data-theme-id="viking"] {
+    font-family: MedievalSharp, serif;
+    font-size-adjust: none;
+    color: #e8a33d;
+  }
 }
 
 /* Matrix theme: phosphor-green terminal on black, CRT scanlines, digital rain */
@@ -793,25 +799,27 @@ html[data-theme="matrix"] {
   }
 }
 
-/* Imperium theme: Roman purple, crimson and gold on dark marble, with Greek-key
-   (meander) bands and laurels. Ornaments are inline SVG so nothing extra loads. */
+/* Imperium theme: a light Roman look. White marble, ivory stone panels with
+   antique-gold trim, umber lettering, Pompeii-fresco pigments on the wheel,
+   Greek-key (meander) bands and laurels. Ornaments are inline SVG. */
 
 html[data-theme="imperium"] {
-  --glass: rgb(34 12 30 / 0.8);
-  --glass-border: rgb(212 175 55 / 0.5);
-  --text: #f3e7c9;
-  --muted: rgb(243 231 201 / 0.65);
-  --accent: #d4af37;
-  --spin: #8e1b24;
+  color-scheme: light;
+  --glass: rgb(250 247 240 / 0.88);
+  --glass-border: rgb(168 128 47 / 0.55);
+  --text: #3b2a22; /* umber */
+  --muted: rgb(59 42 34 / 0.6);
+  --accent: #a8802f; /* antique gold */
+  --pompeian: #9e2b25;
   --radius: 3px;
-  --meander: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23d4af37' stroke-width='1.2'%3E%3Cpath d='M0 11.4H12M0 .6H12M10.5 11.4V2.5H3v6h4.5V5.5'/%3E%3C/svg%3E");
-  --laurel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 60' fill='%23d4af37'%3E%3Cpath d='M22 58Q6 36 20 4' fill='none' stroke='%23d4af37' stroke-width='1.6'/%3E%3Cg%3E%3Cellipse cx='11' cy='50' rx='6' ry='2.4' transform='rotate(-35 11 50)'/%3E%3Cellipse cx='22' cy='45' rx='6' ry='2.4' transform='rotate(35 22 45)'/%3E%3Cellipse cx='7' cy='39' rx='6' ry='2.4' transform='rotate(-45 7 39)'/%3E%3Cellipse cx='18' cy='33' rx='6' ry='2.4' transform='rotate(30 18 33)'/%3E%3Cellipse cx='7' cy='27' rx='6' ry='2.4' transform='rotate(-55 7 27)'/%3E%3Cellipse cx='18' cy='21' rx='6' ry='2.4' transform='rotate(25 18 21)'/%3E%3Cellipse cx='11' cy='14' rx='5.5' ry='2.2' transform='rotate(-65 11 14)'/%3E%3Cellipse cx='20' cy='8' rx='5' ry='2' transform='rotate(10 20 8)'/%3E%3C/g%3E%3C/svg%3E");
+  --meander: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23a8802f' stroke-width='1.2'%3E%3Cpath d='M0 11.4H12M0 .6H12M10.5 11.4V2.5H3v6h4.5V5.5'/%3E%3C/svg%3E");
+  --laurel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 60' fill='%23a8802f'%3E%3Cpath d='M22 58Q6 36 20 4' fill='none' stroke='%23a8802f' stroke-width='1.6'/%3E%3Cg%3E%3Cellipse cx='11' cy='50' rx='6' ry='2.4' transform='rotate(-35 11 50)'/%3E%3Cellipse cx='22' cy='45' rx='6' ry='2.4' transform='rotate(35 22 45)'/%3E%3Cellipse cx='7' cy='39' rx='6' ry='2.4' transform='rotate(-45 7 39)'/%3E%3Cellipse cx='18' cy='33' rx='6' ry='2.4' transform='rotate(30 18 33)'/%3E%3Cellipse cx='7' cy='27' rx='6' ry='2.4' transform='rotate(-55 7 27)'/%3E%3Cellipse cx='18' cy='21' rx='6' ry='2.4' transform='rotate(25 18 21)'/%3E%3Cellipse cx='11' cy='14' rx='5.5' ry='2.2' transform='rotate(-65 11 14)'/%3E%3Cellipse cx='20' cy='8' rx='5' ry='2' transform='rotate(10 20 8)'/%3E%3C/g%3E%3C/svg%3E");
   font-family: Cinzel, serif;
 
   /* The marble itself is drawn on #backdrop (backdrops.js); this gradient shows until then */
   & body {
     animation: none;
-    background: radial-gradient(ellipse at 50% 35%, #3b1433, #1a0818 60%, #0c040b);
+    background: radial-gradient(ellipse at 50% 35%, #f6f5f2, #e8e6e1 60%, #cfccc6);
   }
 
   & #backdrop {
@@ -819,8 +827,8 @@ html[data-theme="imperium"] {
   }
 
   & .panel {
-    backdrop-filter: blur(10px) saturate(1.2);
-    box-shadow: 0 10px 30px rgb(0 0 0 / 0.5), inset 0 0 0 1px rgb(212 175 55 / 0.12);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 8px 24px rgb(60 45 30 / 0.18), inset 0 0 0 1px rgb(255 255 255 / 0.6);
   }
 
   & .theme-bar,
@@ -830,6 +838,23 @@ html[data-theme="imperium"] {
   & .collapse-toggle,
   & .badge {
     border-radius: var(--radius);
+  }
+
+  /* Option previews are styled for dark bars; keep their fonts but use ink here */
+  & .theme-option[data-theme-id] {
+    color: var(--text);
+    text-shadow: none;
+    background: rgb(59 42 34 / 0.05);
+
+    &:hover,
+    &[aria-pressed="true"] {
+      background: rgb(168 128 47 / 0.14);
+    }
+  }
+
+  & .theme-toggle:hover,
+  & .collapse-toggle:hover {
+    background: rgb(59 42 34 / 0.08);
   }
 
   /* Greek-key band along the top of the names panel */
@@ -852,80 +877,106 @@ html[data-theme="imperium"] {
 
   & .btn-ghost {
     letter-spacing: 0.06em;
-    background: rgb(212 175 55 / 0.08);
+    background: rgb(255 255 255 / 0.6);
     border-color: var(--glass-border);
 
     &:hover:not(:disabled) {
-      background: rgb(212 175 55 / 0.18);
+      background: rgb(168 128 47 / 0.14);
     }
   }
 
   & .btn-spin {
     font-weight: 700;
     letter-spacing: 0.18em;
-    color: #f6e9c8;
-    background: linear-gradient(#a3202b, #6e1018);
-    border: 1px solid var(--accent);
-    box-shadow: 0 4px 14px rgb(0 0 0 / 0.5), inset 0 1px 0 rgb(255 220 150 / 0.35), inset 0 -3px 0 rgb(0 0 0 / 0.3);
+    color: #fbf3e0;
+    background: linear-gradient(#ad3a30, #85221c);
+    border: 1px solid #c9a24a;
+    box-shadow: 0 4px 14px rgb(90 30 20 / 0.3), inset 0 1px 0 rgb(255 220 180 / 0.35), inset 0 -3px 0 rgb(0 0 0 / 0.2);
 
     &:hover:not(:disabled) {
-      background: linear-gradient(#b52532, #7a121b);
+      background: linear-gradient(#b8443a, #8f2820);
     }
   }
 
+  & .btn-icon {
+    background: var(--glass);
+  }
+
   & kbd {
-    color: #f6e9c8;
-    border-color: rgb(212 175 55 / 0.5);
+    color: var(--text);
+    text-shadow: none;
+    border-color: rgb(168 128 47 / 0.6);
     border-radius: var(--radius);
-    background: linear-gradient(rgb(212 175 55 / 0.3), rgb(212 175 55 / 0.1));
+    background: linear-gradient(#fffdf8, #ece4d2);
+    box-shadow: 0 2px 0 rgb(120 90 40 / 0.35), inset 0 1px 0 #fff;
+  }
+
+  & .btn-spin kbd {
+    color: #fbf3e0;
+    background: rgb(0 0 0 / 0.18);
+    border-color: rgb(255 230 190 / 0.4);
+    box-shadow: 0 2px 0 rgb(0 0 0 / 0.25);
   }
 
   & .badge {
     color: var(--accent);
-    background: rgb(212 175 55 / 0.12);
+    background: rgb(168 128 47 / 0.12);
   }
 
   & .names-editor {
-    background: rgb(10 2 8 / 0.45);
+    background: rgb(255 255 255 / 0.65);
+    border-color: rgb(168 128 47 / 0.35);
     border-radius: var(--radius);
   }
 
   & #namesList {
-    caret-color: var(--accent);
+    caret-color: var(--text);
 
     &::selection {
-      background: rgb(212 175 55 / 0.3);
+      background: rgb(168 128 47 / 0.28);
     }
   }
 
   & .names-backdrop .off {
-    text-decoration-color: rgb(212 175 55 / 0.6);
+    text-decoration-color: rgb(158 43 37 / 0.6);
   }
 
+  & .names-gutter {
+    border-right-color: rgb(59 42 34 / 0.12);
+
+    & button[aria-pressed="false"] {
+      border-color: rgb(59 42 34 / 0.35);
+    }
+  }
+
+  & .hint code {
+    background: rgb(59 42 34 / 0.08);
+  }
+
+  /* Winner: an ivory marble plaque, Greek-key bands top and bottom */
   & .winner-card {
-    position: relative; /* anchors the meander bands */
+    position: relative;
     padding-block: 34px 30px;
     border-radius: var(--radius);
     border: 1px solid var(--accent);
-    background: rgb(26 6 22 / 0.82);
-    box-shadow: 0 20px 60px rgb(0 0 0 / 0.6), inset 0 0 40px rgb(212 175 55 / 0.08);
+    background: linear-gradient(160deg, rgb(255 253 248 / 0.97), rgb(240 234 222 / 0.97));
+    box-shadow: 0 20px 60px rgb(60 45 30 / 0.3), inset 0 0 0 4px rgb(255 255 255 / 0.7), inset 0 0 0 5px rgb(168 128 47 / 0.35);
 
-    /* Greek-key bands top and bottom */
     &::before,
     &::after {
       content: "";
       position: absolute;
-      inset-inline: 10px;
+      inset-inline: 12px;
       height: 12px;
       background: var(--meander) repeat-x;
     }
 
     &::before {
-      top: 8px;
+      top: 10px;
     }
 
     &::after {
-      bottom: 8px;
+      bottom: 10px;
     }
   }
 
@@ -934,7 +985,7 @@ html[data-theme="imperium"] {
     letter-spacing: 0.4em;
   }
 
-  /* Gold lettering flanked by laurel branches */
+  /* Inscribed in Pompeian red, flanked by gold laurel branches */
   & .winner-name {
     display: flex;
     align-items: center;
@@ -943,9 +994,10 @@ html[data-theme="imperium"] {
     font-weight: 700;
     font-size: clamp(40px, 8vw, 80px);
     letter-spacing: 0.04em;
-    background: linear-gradient(to bottom, #fff2c4 10%, #e8bf4f 50%, #c99a2e 51%, #8a6414 100%);
-    background-clip: text;
-    filter: drop-shadow(0 2px 0 rgb(0 0 0 / 0.6)) drop-shadow(0 0 10px rgb(212 175 55 / 0.35));
+    color: var(--pompeian);
+    background: none;
+    filter: none;
+    text-shadow: 0 1px 0 #fff, 0 -1px 0 rgb(80 20 15 / 0.25);
 
     &::before,
     &::after {
@@ -958,6 +1010,215 @@ html[data-theme="imperium"] {
 
     &::after {
       scale: -1 1;
+    }
+  }
+
+  & .winner-card .btn-ghost {
+    color: var(--text);
+  }
+}
+
+/* Viking theme: firelit runestones, dark wood bound with iron, parchment and ink.
+   The wall, glow and embers are drawn on #backdrop (backdrops.js). */
+
+html[data-theme="viking"] {
+  --glass: #2a1a0e;
+  --glass-border: #120c08;
+  --text: #f1dfb4;
+  --muted: rgb(241 223 180 / 0.6);
+  --accent: #e8a33d; /* torch amber */
+  --radius: 5px;
+  --ink: #2b1a0e;
+  --parchment: radial-gradient(ellipse at 50% 40%, #f3e5c2 35%, #e3c995 75%, #c49a5c 100%);
+  --wood:
+    repeating-linear-gradient(0deg, rgb(0 0 0 / 0.12) 0 1px, transparent 1px 7px),
+    repeating-linear-gradient(0deg, rgb(255 220 170 / 0.04) 0 2px, transparent 2px 19px),
+    linear-gradient(#3e2817, #24160b);
+  --rivet: radial-gradient(circle, #8a8a92 0 1.5px, #3a3a40 2.5px, #141416 3.5px, transparent 4px);
+  --runes: "ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗᛚᛜᛞᛟ"; /* Elder Futhark */
+  --paint: #d0492c; /* red ochre */
+  font-family: MedievalSharp, "Noto Sans Runic", serif;
+
+  /* Rune band along the top of the names panel */
+  & .names-panel {
+    padding-top: 26px;
+
+    &::before {
+      content: var(--runes);
+      position: absolute;
+      inset: 6px 16px auto;
+      overflow: hidden;
+      white-space: nowrap;
+      text-align: center;
+      font: 12px/14px "Noto Sans Runic", serif;
+      letter-spacing: 0.5em;
+      color: rgb(232 163 61 / 0.6);
+    }
+  }
+
+  & body {
+    animation: none;
+    background: #0b0806;
+  }
+
+  & #backdrop {
+    display: block;
+  }
+
+  /* Dark planks with an iron rivet in each corner */
+  & .panel {
+    backdrop-filter: none;
+    border: 2px solid var(--glass-border);
+    background:
+      var(--rivet) 3px 3px / 10px 10px no-repeat,
+      var(--rivet) calc(100% - 3px) 3px / 10px 10px no-repeat,
+      var(--rivet) 3px calc(100% - 3px) / 10px 10px no-repeat,
+      var(--rivet) calc(100% - 3px) calc(100% - 3px) / 10px 10px no-repeat,
+      var(--wood);
+    box-shadow: 0 12px 30px rgb(0 0 0 / 0.6), inset 0 1px 0 rgb(255 210 150 / 0.1);
+  }
+
+  & .theme-bar,
+  & .btn,
+  & .theme-option,
+  & .theme-toggle,
+  & .collapse-toggle,
+  & .badge {
+    border-radius: var(--radius);
+  }
+
+  & .badge {
+    color: var(--accent);
+    background: rgb(232 163 61 / 0.15);
+  }
+
+  & .btn-ghost {
+    background: rgb(0 0 0 / 0.25);
+    border-color: rgb(232 163 61 / 0.35);
+
+    &:hover:not(:disabled) {
+      background: rgb(232 163 61 / 0.15);
+    }
+  }
+
+  /* A wooden plank with iron bands at both ends */
+  & .btn-spin {
+    font-family: MedievalSharp, serif;
+    font-size: 26px;
+    font-weight: 400;
+    letter-spacing: 0.16em;
+    color: #f6e6c0;
+    text-shadow: 0 2px 0 rgb(0 0 0 / 0.7);
+    background:
+      linear-gradient(90deg, #303036 0 12px, transparent 12px calc(100% - 12px), #303036 calc(100% - 12px)),
+      repeating-linear-gradient(0deg, rgb(0 0 0 / 0.14) 0 1px, transparent 1px 6px),
+      linear-gradient(#80522c, #4b2e17);
+    border: 2px solid #141416;
+    box-shadow: 0 6px 16px rgb(0 0 0 / 0.6), inset 0 1px 0 rgb(255 220 170 / 0.25);
+
+    &:hover:not(:disabled) {
+      filter: brightness(1.12);
+    }
+  }
+
+  & .btn-icon {
+    background: var(--wood);
+    border: 2px solid var(--glass-border);
+  }
+
+  /* Forged iron keycaps */
+  & kbd {
+    color: #ececf2;
+    text-shadow: none;
+    border-color: #141416;
+    border-radius: 3px;
+    background: linear-gradient(#5d5d65, #303036);
+  }
+
+  /* The names list is a sheet of parchment, written in ink */
+  & .names-editor {
+    --text: var(--ink);
+    --muted: rgb(43 26 14 / 0.5);
+    color: var(--ink);
+    background: var(--parchment);
+    border: 1px solid #120c08;
+    border-radius: 3px;
+    box-shadow: inset 0 0 18px rgb(110 60 20 / 0.45);
+  }
+
+  & #namesList {
+    caret-color: var(--ink);
+
+    &::selection {
+      background: rgb(139 26 26 / 0.25);
+    }
+  }
+
+  & .names-backdrop .off {
+    text-decoration-color: rgb(139 26 26 / 0.7);
+  }
+
+  & .names-gutter {
+    border-right-color: rgb(43 26 14 / 0.2);
+
+    & button[aria-pressed="false"] {
+      border-color: rgb(43 26 14 / 0.45);
+    }
+  }
+
+  /* Winner: a painted runestone, arched on top, with a rune band at its foot.
+     Real runestones were colored, often with red ochre. */
+  & .winner-card {
+    position: relative;
+    padding-block: 52px 46px;
+    color: #e8e0d4;
+    background:
+      radial-gradient(ellipse at 30% 15%, rgb(255 255 255 / 0.1), transparent 55%),
+      radial-gradient(circle at 75% 70%, rgb(0 0 0 / 0.18), transparent 40%),
+      linear-gradient(160deg, #75706a, #4d4945 60%, #33302d);
+    border: 2px solid #1f1c1a;
+    border-radius: 48% 48% 12px 12px / 34% 34% 12px 12px;
+    backdrop-filter: none;
+    box-shadow: 0 20px 60px rgb(0 0 0 / 0.7), inset 0 0 34px rgb(0 0 0 / 0.55), inset 0 2px 0 rgb(255 255 255 / 0.12);
+
+    &::after {
+      content: var(--runes);
+      position: absolute;
+      inset: auto 18px 12px;
+      overflow: hidden;
+      white-space: nowrap;
+      text-align: center;
+      font: 15px/1 "Noto Sans Runic", serif;
+      letter-spacing: 0.45em;
+      color: var(--paint);
+      text-shadow: 0 1px 0 rgb(0 0 0 / 0.5);
+    }
+  }
+
+  /* Cut into the stone and painted: dark groove below, faint light above */
+  & .winner-label {
+    font-size: 22px;
+    letter-spacing: 0.18em;
+    text-transform: none;
+    color: var(--paint);
+    text-shadow: 0 1px 0 rgb(0 0 0 / 0.55), 0 -1px 0 rgb(255 255 255 / 0.12);
+  }
+
+  & .winner-name {
+    font-family: MedievalSharp, serif;
+    color: var(--paint);
+    background: none;
+    filter: none;
+    text-shadow: 0 3px 0 rgb(0 0 0 / 0.45), 0 -1px 0 rgb(255 255 255 / 0.14);
+  }
+
+  & .winner-card .btn-ghost {
+    color: #ece4d8;
+    background: rgb(0 0 0 / 0.18);
+    border-color: rgb(236 228 216 / 0.3);
+
+    &:hover:not(:disabled) {
+      background: rgb(0 0 0 / 0.3);
     }
   }
 }
