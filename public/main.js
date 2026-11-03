@@ -59,7 +59,7 @@ Object.assign(light.shadow.camera, { near: 1, far: 60, left: -15, right: 15, top
 light.shadow.radius = 4;
 scene.add(light);
 
-const floorMaterial = new THREE.ShadowMaterial();
+const floorMaterial = new THREE.ShadowMaterial({ depthWrite: false }); // shadows only; never hides what's behind
 const floor = new THREE.Mesh(new THREE.CircleGeometry(30, 64), floorMaterial);
 floor.rotation.x = -Math.PI / 2;
 floor.position.y = -WHEEL_THICKNESS / 2 - 1.2;
@@ -97,6 +97,7 @@ const applySceneTheme = () => {
   pointerMaterial.emissiveIntensity = p.glow;
   pointerMaterial.metalness = p.metalness ?? 0.3;
   pointerMaterial.roughness = p.roughness ?? 0.35;
+  pointerGear.visible = Boolean(theme.pointerGear);
 };
 
 // Segment surface textures, tinted by each segment's color (map × color).
@@ -153,6 +154,32 @@ const TEXTURE_PAINTERS = {
     }
   },
 
+  // Brushed metal: fine streaks running one way, a little lighter and darker
+  brushed: (ctx, size, r) => {
+    ctx.fillStyle = '#dcdcdc';
+    ctx.fillRect(0, 0, size, size);
+    for (let i = 0; i < 2600; i++) {
+      ctx.fillStyle = Math.random() < 0.5 ? `rgb(255 255 255 / ${0.05 + r(0.12)})` : `rgb(0 0 0 / ${0.04 + r(0.08)})`;
+      ctx.fillRect(r(size * 1.2) - size * 0.2, r(), 30 + r(220), 1);
+    }
+  },
+
+  // Sandstone: fine grit, with soft horizontal strata of slightly different tone
+  sandstone: (ctx, size, r) => {
+    ctx.fillStyle = '#e4e4e4';
+    ctx.fillRect(0, 0, size, size);
+    for (let y = 0; y < size; ) {
+      const band = 6 + r(30);
+      ctx.fillStyle = Math.random() < 0.5 ? `rgb(255 250 235 / ${r(0.18)})` : `rgb(90 60 30 / ${r(0.1)})`;
+      ctx.fillRect(0, y, size, band);
+      y += band;
+    }
+    for (let i = 0; i < 9000; i++) {
+      ctx.fillStyle = Math.random() < 0.5 ? 'rgb(70 45 20 / 0.18)' : 'rgb(255 255 245 / 0.25)';
+      ctx.fillRect(r(), r(), 1 + r(1.5), 1 + r(1.5));
+    }
+  },
+
   // Planks: long wavy grain lines along x, a few knots with rings bent around them
   wood: (ctx, size, r) => {
     ctx.fillStyle = '#c8c8c8';
@@ -188,20 +215,38 @@ const TEXTURE_PAINTERS = {
   },
 };
 
-// Elder Futhark carved in a ring on the wheel's top face, just inside the
-// studs: a transparent disc laid over the segments. Each rune is drawn twice,
-// a dark groove and a faint lit edge, so it reads as cut into the wood.
-const FUTHARK = 'ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗᛚᛜᛞᛟ';
+// Cog outline: trapezoid teeth around a circle, plus optional round holes
+// ([x, y, radius] each). Used for the Steampunk hub and pointer gear.
+const makeGearShape = (radius, teeth, toothDepth, holes = []) => {
+  const shape = new THREE.Shape();
+  const steps = teeth * 4;
+  for (let i = 0; i <= steps; i++) {
+    const a = (i / steps) * TAU;
+    const r = i % 4 < 2 ? radius : radius - toothDepth; // two points on the tip, two in the gap
+    if (i === 0) shape.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+    else shape.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+  }
+  for (const [x, y, r] of holes) {
+    const hole = new THREE.Path();
+    hole.absarc(x, y, r, 0, TAU, true);
+    shape.holes.push(hole);
+  }
+  return shape;
+};
 
-const makeRuneRing = () => {
+// A theme's glyphs (runes, hieroglyphs…) carved in a ring on the wheel's top
+// face, just inside the rim: a transparent disc laid over the segments. Each
+// glyph is drawn twice, a dark groove and a faint lit edge, so it reads as cut in.
+const makeGlyphRing = ({ glyphs, font }) => {
+  const symbols = [...glyphs]; // by code point: hieroglyphs are two UTF-16 units each
   const size = 2048;
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext('2d');
   const center = size / 2;
   const radius = center * ((WHEEL_RADIUS - 0.95) / WHEEL_RADIUS); // texture spans the whole disc
-  const count = FUTHARK.length * 2;
-  ctx.font = `${Math.round(size * 0.042)}px "Noto Sans Runic", serif`;
+  const count = Math.ceil(48 / symbols.length) * symbols.length;
+  ctx.font = `${Math.round(size * 0.042)}px ${font}, serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   for (let i = 0; i < count; i++) {
@@ -209,11 +254,11 @@ const makeRuneRing = () => {
     ctx.save();
     ctx.translate(center + Math.cos(angle) * radius, center + Math.sin(angle) * radius);
     ctx.rotate(angle + Math.PI / 2); // upright, reading around the rim
-    const rune = [...FUTHARK][i % FUTHARK.length];
+    const glyph = symbols[i % symbols.length];
     ctx.fillStyle = 'rgb(255 225 180 / 0.22)';
-    ctx.fillText(rune, 2.5, 2.5);
+    ctx.fillText(glyph, 2.5, 2.5);
     ctx.fillStyle = 'rgb(14 6 2 / 0.85)';
-    ctx.fillText(rune, 0, 0);
+    ctx.fillText(glyph, 0, 0);
     ctx.restore();
   }
   const texture = new THREE.CanvasTexture(canvas);
@@ -229,13 +274,60 @@ const makeRuneRing = () => {
   return disc;
 };
 
+// A glowing axis through the wheel's center, running off screen both ways: a
+// bright core inside an additive halo, with pulses of light flowing down it.
+// Long enough (±100) to leave the view at any aspect; the part inside the
+// wheel is hidden by the segments.
+let axisStream = null; // the halo's texture, scrolled each frame
+const AXIS_LENGTH = 200;
+
+const makeAxis = () => {
+  const glow = theme.metal.emissive;
+  const stripes = document.createElement('canvas');
+  stripes.width = 4;
+  stripes.height = 128;
+  const ctx = stripes.getContext('2d');
+  const pulse = ctx.createLinearGradient(0, 0, 0, 128);
+  pulse.addColorStop(0, 'rgb(255 255 255 / 0.35)');
+  pulse.addColorStop(0.15, 'rgb(255 255 255 / 1)');
+  pulse.addColorStop(0.3, 'rgb(255 255 255 / 0.35)');
+  pulse.addColorStop(1, 'rgb(255 255 255 / 0.35)');
+  ctx.fillStyle = pulse;
+  ctx.fillRect(0, 0, 4, 128);
+  axisStream = new THREE.CanvasTexture(stripes);
+  axisStream.wrapT = THREE.RepeatWrapping;
+  axisStream.repeat.set(1, 40);
+
+  const axis = new THREE.Group();
+  axis.add(
+    new THREE.Mesh(
+      new THREE.CylinderGeometry(0.09, 0.09, AXIS_LENGTH, 12),
+      // Transparent only so it sorts with the halo, after the floor (see below)
+      new THREE.MeshBasicMaterial({ color: new THREE.Color(glow).lerp(new THREE.Color(0xffffff), 0.6), transparent: true })
+    ),
+    new THREE.Mesh(
+      new THREE.CylinderGeometry(0.38, 0.38, AXIS_LENGTH, 24, 1, true),
+      new THREE.MeshBasicMaterial({
+        color: glow,
+        map: axisStream,
+        transparent: true,
+        opacity: 0.45,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
+    )
+  );
+  // Drawn after the floor's shadow layer, which would otherwise darken the pole where it passes under it
+  axis.children.forEach((mesh) => (mesh.renderOrder = 1));
+  return axis;
+};
+
 const getSegmentTexture = (kind) => {
   if (!kind) return null;
   segmentTextures[kind] ??= makeTexture(TEXTURE_PAINTERS[kind]);
   return segmentTextures[kind];
 };
 const isSharedTexture = (texture) => Object.values(segmentTextures).includes(texture);
-applySceneTheme();
 
 // Wheel
 
@@ -296,6 +388,7 @@ const makeLabelTexture = (text, aspect) => {
 
 const buildWheel = (names, colors) => {
   disposeChildren(wheel);
+  axisStream = null;
 
   const count = names.length;
   const segmentAngle = TAU / count;
@@ -322,6 +415,7 @@ const buildWheel = (names, colors) => {
         color: colors[i],
         map: getSegmentTexture(theme.segment.texture),
         roughness: theme.segment.roughness,
+        metalness: theme.segment.metalness ?? 0,
         emissive: colors[i],
         emissiveIntensity: theme.segment.glow,
       })
@@ -365,13 +459,39 @@ const buildWheel = (names, colors) => {
     wheel.add(ring);
   }
 
-  if (theme.boss) {
+  if (theme.hub === 'boss') {
     // Shield boss: a low iron dome
     const boss = new THREE.Mesh(new THREE.SphereGeometry(1.4, 40, 16, 0, TAU, 0, Math.PI / 2), metal);
     boss.scale.y = 0.55;
     boss.position.y = WHEEL_THICKNESS / 2;
     boss.castShadow = true;
     wheel.add(boss);
+  } else if (theme.hub === 'gear') {
+    // Brass cog with lightening holes, and a bolt through its middle
+    const holes = Array.from({ length: 6 }, (_, k) => {
+      const a = (k / 6) * TAU;
+      return [Math.cos(a) * 0.95, Math.sin(a) * 0.95, 0.3];
+    });
+    const cog = new THREE.Mesh(
+      new THREE.ExtrudeGeometry(makeGearShape(1.75, 16, 0.28, holes), { depth: 0.3, bevelEnabled: true, bevelSize: 0.03, bevelThickness: 0.03, bevelSegments: 1 }),
+      metal
+    );
+    cog.rotation.x = -Math.PI / 2;
+    cog.position.y = WHEEL_THICKNESS / 2;
+    cog.castShadow = true;
+    const bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.6, 6), metal);
+    bolt.position.y = WHEEL_THICKNESS / 2 + 0.3;
+    bolt.castShadow = true;
+    wheel.add(cog, bolt);
+  } else if (theme.hub === 'axis') {
+    wheel.add(makeAxis());
+  } else if (theme.hub === 'pyramid') {
+    // A four-sided cone is a pyramid; turned 45° so a face, not an edge, looks at the camera
+    const pyramid = new THREE.Mesh(new THREE.ConeGeometry(1.5, 1.6, 4), metal);
+    pyramid.position.y = WHEEL_THICKNESS / 2 + 0.8;
+    pyramid.rotation.y = Math.PI / 4;
+    pyramid.castShadow = true;
+    wheel.add(pyramid);
   } else {
     const hub = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.3, 0.4, 48), metal);
     hub.position.y = WHEEL_THICKNESS / 2 + 0.2;
@@ -379,7 +499,7 @@ const buildWheel = (names, colors) => {
     wheel.add(hub);
   }
 
-  if (theme.runeRing) wheel.add(makeRuneRing());
+  if (theme.glyphRing) wheel.add(makeGlyphRing(theme.glyphRing));
 
   // Iron-bound look: domed studs evenly around the top rim, independent of segments
   if (theme.studs) {
@@ -420,6 +540,18 @@ const pointerCap = new THREE.Mesh(new THREE.SphereGeometry(0.32, 24, 16), metal)
 pointerCap.castShadow = true;
 pointer.add(pointerTip, pointerCap);
 scene.add(pointer);
+
+// Small gear around the pivot, facing the camera; shown by themes with pointerGear,
+// turning with the wheel (geared up, like it's driven by the rim)
+const POINTER_GEAR_RATIO = 4;
+const pointerGearGeometry = new THREE.ExtrudeGeometry(makeGearShape(0.62, 12, 0.14), { depth: 0.12, bevelEnabled: false });
+pointerGearGeometry.translate(0, 0, -0.06).rotateY(Math.PI / 2); // center on the pivot, face +X
+const pointerGear = new THREE.Mesh(pointerGearGeometry, metal);
+pointerGear.castShadow = true;
+pointerGear.visible = false;
+pointer.add(pointerGear);
+
+applySceneTheme(); // lights and shared materials; needs the pointer gear above
 
 // Sound
 
@@ -511,7 +643,10 @@ const playFanfare = () => {
   if (!canPlay()) return;
   const t = audio.currentTime;
   const { fanfare } = theme.sound;
-  fanfare.notes.forEach((freq, i) => beep(freq, t + i * fanfare.gap, fanfare.duration, fanfare));
+  // glide > 1 bends each note up over its length
+  fanfare.notes.forEach((freq, i) =>
+    beep(freq, t + i * fanfare.gap, fanfare.duration, fanfare, { endFreq: freq * (fanfare.glide ?? 1) })
+  );
 };
 
 // Names
@@ -944,6 +1079,8 @@ renderer.setAnimationLoop((time) => {
   }
 
   updatePointer(dt);
+  if (axisStream && !reducedMotion.matches) axisStream.offset.y += dt * 0.8; // pulses flow down
+  if (pointerGear.visible) pointerGear.rotation.x = -wheel.rotation.y * POINTER_GEAR_RATIO;
   if (theme.lights.flicker && !reducedMotion.matches) flickerTorchlight(time / 1000);
   renderer.render(scene, camera);
 });

@@ -45,6 +45,7 @@ export const THEMES = {
     ],
     emptyColor: '#062a0e',
     segment: { roughness: 0.8, glow: 0.35 },
+    hub: 'axis', // glowing pole through the center instead of a hub disc
     label: {
       font: (size) => `${Math.round(size * 1.25)}px VT323, ui-monospace, monospace`,
       fill: '#b8ffc8',
@@ -111,8 +112,9 @@ export const THEMES = {
     emptyColor: '#3e2a1a',
     segment: { roughness: 0.85, glow: 0, texture: 'wood' },
     studs: true, // iron studs around the top rim
-    boss: true, // domed iron shield boss instead of the flat hub
-    runeRing: true, // Elder Futhark carved around the top face
+    hub: 'boss', // domed iron shield boss instead of the flat hub
+    // Elder Futhark carved around the top face
+    glyphRing: { glyphs: 'ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗᛚᛜᛞᛟ', font: '"Noto Sans Runic"' },
     label: {
       font: (size) => `${Math.round(size * 0.95)}px MedievalSharp, serif`,
       fill: '#f3e2b8', // parchment
@@ -138,5 +140,114 @@ export const THEMES = {
     // Runes come from a unicode-range font, so name the characters to fetch
     fontsToLoad: ['64px MedievalSharp', ['48px "Noto Sans Runic"', 'ᚠᚢᚦᚨᚱᚲᛏ']],
     backdrop: 'runestones', // backdrops.js
+  },
+
+  desert: {
+    name: 'Desert',
+    // Sand and gold, with the pigments of Egyptian tomb painting and jewelry:
+    // lapis, turquoise faience, carnelian, malachite, kohl black
+    palette: [
+      '#d4a84a', '#1f4e8c', '#c98b2b', '#2a8a80', '#b98a4e',
+      '#a8402a', '#e0b860', '#2a2420', '#c4954a', '#3e7d4f',
+      '#d9ae52', '#173a6b', '#b77a2e', '#1e756d', '#caa065',
+      '#8f3520', '#d6a845', '#3a2f28', '#bf8f45', '#356b44',
+    ],
+    emptyColor: '#c4954a',
+    segment: { roughness: 0.8, glow: 0, texture: 'sandstone' },
+    hub: 'pyramid', // gold pyramid in the middle
+    // Hieroglyphs carved around the face: ankh, eye of Horus, scarab, sun, owl, cobra, djed…
+    glyphRing: { glyphs: '𓋹𓂀𓆣𓇳𓅓𓆓𓊽𓄿𓈖𓃭𓇋𓋴𓀭𓁟𓊪𓃀', font: '"Noto Sans Egyptian Hieroglyphs"' },
+    label: {
+      font: (size) => `${Math.round(size * 0.9)}px Marcellus, serif`,
+      fill: '#fff6dc',
+      stroke: 'rgb(40 25 8 / 0.85)',
+      glow: null,
+    },
+    metal: { color: 0xd4a84a, metalness: 0.9, roughness: 0.25, emissive: 0x000000, glow: 0 }, // gold
+    pointer: { color: 0x1f4e8c, emissive: 0x000000, glow: 0, metalness: 0.4, roughness: 0.3 }, // lapis
+    // Hard desert sun with a warm sand bounce
+    lights: { sky: 0xfff4d6, ground: 0xc89a5a, color: 0xfff0c8, hemisphere: 1.2, directional: 2, environment: 0.25, shadow: 0.4 },
+    // A dry sistrum jingle, and a reed-like run up the hijaz scale
+    sound: {
+      wave: 'triangle',
+      volume: 0.9,
+      tick: { from: 2400, to: 1900, duration: 0.05 },
+      fanfare: { notes: [293.66, 311.13, 369.99, 392, 440, 587.33], gap: 0.13, duration: 0.6, wave: 'sawtooth', lowpass: 1800, volume: 0.3 },
+    },
+    fireworksHue: { min: 40, max: 55 }, // gold
+    winnerLabel: '𓋹 Chosen of Ra 𓋹',
+    // Hieroglyphs come from a unicode-range font, so name the characters to fetch
+    fontsToLoad: ['64px Marcellus', ['48px "Noto Sans Egyptian Hieroglyphs"', '𓋹𓂀𓆣𓇳𓅓𓆓𓊽𓄿𓈖𓃭𓇋𓋴𓀭𓁟𓊪𓃀']],
+    backdrop: 'dunes', // backdrops.js
+  },
+
+  steampunk: {
+    name: 'Steampunk',
+    // Brass, copper, bronze and gunmetal between verdigris patina and oxblood leather
+    palette: [
+      '#b5893a', '#2f6b62', '#b87333', '#5a1e1a', '#8c6a3a',
+      '#3d3a36', '#c9a050', '#3f7f73', '#9a5a2c', '#6e2a22',
+      '#a8823e', '#2b5650', '#c07a3e', '#4a1915', '#7d5e34',
+      '#2e2c2a', '#bf9548', '#356f66', '#8f4f26', '#622620',
+    ],
+    emptyColor: '#3d3a36',
+    segment: { roughness: 0.4, metalness: 0.6, glow: 0, texture: 'brushed' },
+    hub: 'gear', // brass cog with lightening holes
+    studs: true, // brass rivets around the top rim
+    pointerGear: true, // small gear at the pointer pivot, turning with the wheel
+    label: {
+      font: (size) => `${Math.round(size * 0.85)}px Rye, serif`,
+      fill: '#f6e7c4',
+      stroke: 'rgb(30 15 5 / 0.9)',
+      glow: null,
+    },
+    metal: { color: 0xb5893a, metalness: 0.95, roughness: 0.32, emissive: 0x000000, glow: 0 }, // brass
+    pointer: { color: 0xb87333, emissive: 0x000000, glow: 0, metalness: 0.95, roughness: 0.28 }, // copper
+    // Warm gaslight; a stronger environment so the metals have something to reflect
+    lights: { sky: 0xffe8c0, ground: 0x2a1a0a, color: 0xffd9a0, hemisphere: 0.8, directional: 1.8, environment: 0.55, shadow: 0.5 },
+    // Clockwork ticks, and a steam whistle: a chord sounded together, sliding up as pressure builds
+    sound: {
+      wave: 'square',
+      volume: 0.5,
+      tick: { from: 1500, to: 700, duration: 0.018 },
+      fanfare: { notes: [523.25, 659.25, 783.99], gap: 0, duration: 1.4, glide: 1.04, wave: 'sawtooth', lowpass: 2600, volume: 0.45 },
+    },
+    fireworksHue: { min: 25, max: 45 }, // copper and brass sparks
+    winnerLabel: 'Eureka!',
+    fontsToLoad: ['64px Rye'],
+    backdrop: 'gears', // backdrops.js
+  },
+
+  synthwave: {
+    name: 'Synthwave',
+    // Neon pink, cyan, violet and electric blue, each next to near-black so the glow pops
+    palette: [
+      '#ff2a6d', '#1a0b2e', '#05d9e8', '#2b0f4a', '#b14aed',
+      '#120626', '#ff6ec7', '#1e0b3a', '#2d6bff', '#160a2c',
+      '#d300c5', '#24103f', '#00f0ff', '#1a0b2e', '#ff3864',
+      '#2b0f4a', '#7b2cff', '#120626', '#ff9ef0', '#1e0b3a',
+    ],
+    emptyColor: '#2b0f4a',
+    segment: { roughness: 0.3, metalness: 0.2, glow: 0.3 },
+    label: {
+      font: (size) => `700 ${Math.round(size * 0.8)}px Orbitron, sans-serif`,
+      fill: '#ffffff',
+      stroke: 'rgb(20 0 30 / 0.85)',
+      glow: '#ff2a6d',
+    },
+    metal: { color: 0x05d9e8, metalness: 0.3, roughness: 0.3, emissive: 0x05d9e8, glow: 0.9 }, // neon tubes
+    pointer: { color: 0xff2a6d, emissive: 0xff2a6d, glow: 0.7, metalness: 0.3, roughness: 0.3 },
+    lights: { sky: 0xff6ec7, ground: 0x1a0b2e, color: 0xb0e0ff, hemisphere: 0.6, directional: 1.2, environment: 0.3, shadow: 0.5 },
+    // Synth blips, and a filtered sawtooth arpeggio up A minor
+    sound: {
+      wave: 'square',
+      volume: 0.35,
+      tick: { from: 1200, to: 2400, duration: 0.03 },
+      fanfare: { notes: [220, 261.63, 329.63, 392, 493.88, 659.25], gap: 0.09, duration: 0.8, wave: 'sawtooth', lowpass: 2200, volume: 1 },
+    },
+    fireworksHue: { min: 280, max: 330 }, // magenta and violet
+    winnerLabel: 'High Score',
+    fontsToLoad: ['700 64px Orbitron'],
+    backdrop: 'outrun', // backdrops.js
   },
 };
