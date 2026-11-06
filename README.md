@@ -1,40 +1,18 @@
 # Wheel of Names
 
-3D wheel of names built with Three.js. Choose a theme, spin the wheel, hear sound as it ticks, and get fireworks when a winner is chosen.
+A 3D wheel for drawing names, with themes, sound and fireworks. Built with Three.js.
 
-Live demo: https://wheel.malbq.dev
+Live: https://wheel.malbq.dev
 
-## Setup
+The site is 100% static: plain HTML, CSS and JavaScript in `public/`, with no build step and no backend. Three.js and fireworks-js load from a CDN, and sounds come from the Web Audio API.
 
-Needs Node.js (see `.node-version`). Install with the lockfile:
+## Run locally
 
 ```bash
 npm install
-```
-
-## Run
-
-```bash
 npm run dev
 ```
 
-Starts the local Cloudflare dev server and serves the static files in `public/`. There is no separate build step.
-
 ## Deploy
 
-```bash
-npm run deploy
-```
-
-Publishes the Worker and static assets to Cloudflare (Cloudflare login required).
-
-## License
-
-MIT. See [LICENSE](LICENSE). Copyright (c) 2026 Mauro Albuquerque.
-
-Third-party runtime dependencies are loaded from CDNs and keep their own licenses:
-
-- [Three.js](https://threejs.org/) and [fireworks-js](https://github.com/crashmax-dev/fireworks-js) via jsDelivr (see versions in `public/index.html`)
-- Theme fonts via Google Fonts
-
-This repo does not vendor those packages. Sound is generated with the Web Audio API. The only bundled media file is `public/og-image.jpg` (social preview). If you add more media assets later, confirm each file's license before treating it as project-owned.
+Every push to `master` deploys to Cloudflare. To deploy by hand, run `npm run deploy`.
