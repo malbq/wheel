@@ -37,4 +37,4 @@ Third-party runtime dependencies are loaded from CDNs and keep their own license
 - [Three.js](https://threejs.org/) and [fireworks-js](https://github.com/crashmax-dev/fireworks-js) via jsDelivr (see versions in `public/index.html`)
 - Theme fonts via Google Fonts
 
-This repo does not vendor those packages. Sound is generated with the Web Audio API; there are no bundled audio or image media files in the tree. If you add media assets later, confirm each file's license before treating it as project-owned.
+This repo does not vendor those packages. Sound is generated with the Web Audio API. The only bundled media file is `public/og-image.jpg` (social preview). If you add more media assets later, confirm each file's license before treating it as project-owned.
