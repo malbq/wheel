@@ -1,6 +1,9 @@
 {
   "name": "wheel",
-  "private": true,
+  "description": "3D wheel of names built with Three.js, with themes, sound, and fireworks for the winner.",
+  "license": "MIT",
+  "author": "Mauro Albuquerque",
+  "homepage": "https://wheel.malbq.dev",
   "type": "module",
   "scripts": {
     "dev": "cf dev",
